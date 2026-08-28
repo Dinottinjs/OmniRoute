@@ -8,6 +8,7 @@ from rich.prompt import Prompt
 from rich.align import Align
 from rich.text import Text
 from rich.table import Table
+from rich import box
 from core.updater import check_for_updates
 from core.scanner import NetworkScanner
 from core.agent import RouterAgent
@@ -46,15 +47,40 @@ def scan_wifi():
     networks = scanner.scan_wifi()
     
     console.print(f"\n[bold green]Gefundene WLAN-Netzwerke: {len(networks)}[/bold green]")
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("SSID")
-    table.add_column("Kanal", justify="right")
-    table.add_column("Signal", justify="right")
+    table = Table(title="📡 WLAN-Spektrum Analyse", show_header=True, header_style="bold white on blue", box=box.ROUNDED, expand=True)
+    table.add_column("SSID", style="bold cyan")
+    table.add_column("Kanal", justify="center", style="yellow")
+    table.add_column("Frequenz", justify="center")
+    table.add_column("Signal (%)", justify="right")
     table.add_column("dBm", justify="right")
+    table.add_column("Bewertung", justify="center")
     
     for net in networks:
-        dbm = net.get('dbm', '?')
-        table.add_row(net['ssid'], str(net['channel']), f"{net['signal']}%", f"{dbm} dBm")
+        dbm = net.get('dbm', -100)
+        signal = net.get('signal', 0)
+        channel = net.get('channel', 0)
+        
+        freq = "5 GHz" if channel > 14 else "2.4 GHz" if channel > 0 else "?"
+        
+        if dbm >= -60:
+            rating = "[bold green]Exzellent[/bold green]"
+            row_style = "green"
+        elif dbm >= -75:
+            rating = "[bold yellow]Gut[/bold yellow]"
+            row_style = "yellow"
+        else:
+            rating = "[bold red]Schwach[/bold red]"
+            row_style = "red"
+            
+        table.add_row(
+            net['ssid'] or "[dim]<Versteckt>[/dim]",
+            str(channel),
+            freq,
+            f"{signal}%",
+            f"{dbm} dBm",
+            rating,
+            style=row_style
+        )
     console.print(table)
 
 @app.command()
@@ -73,12 +99,30 @@ def scan_topology():
     devices = scanner.scan_topology()
     
     console.print(f"\n[bold green]Netzwerkgeräte gefunden: {len(devices)}[/bold green]")
-    table = Table(show_header=True, header_style="bold magenta")
-    table.add_column("IP Adresse")
-    table.add_column("MAC Adresse")
     
-    for dev in devices:
-        table.add_row(dev['ip'], dev['mac'])
+    table = Table(title="🕸️ Lokale Netzwerk-Topologie", show_header=True, header_style="bold white on purple", box=box.ROUNDED)
+    table.add_column("Typ", justify="center")
+    table.add_column("IP Adresse", style="cyan", justify="left")
+    table.add_column("MAC Adresse", style="magenta", justify="left")
+    
+    gateway_ip = scanner.find_gateway()
+    
+    for idx, dev in enumerate(devices):
+        ip = dev.get('ip', 'Error')
+        mac = dev.get('mac', '')
+        
+        icon = "💻 Gerät"
+        row_style = "white"
+        
+        if ip == gateway_ip:
+            icon = "🌐 Router/Gateway"
+            row_style = "bold green"
+        elif "Error" in ip:
+            icon = "❌ Fehler"
+            row_style = "red"
+            
+        table.add_row(icon, ip, mac, style=row_style)
+        
     console.print(table)
 
 @app.command()
@@ -157,68 +201,77 @@ def manual_config():
 @app.command()
 def positioning_assistant():
     """Startet ein Live-Radar zur Router-Positionierung (dBm Messung)."""
-    console.print("[bold cyan]=== Positionierungs-Assistent ===[/bold cyan]")
-    scanner = NetworkScanner()
-    
-    networks = scanner.scan_wifi()
-    if not networks:
-        console.print("[red]Keine Netzwerke gefunden![/red]")
-        return
-        
-    unique_ssids = list(set([n['ssid'] for n in networks if n['ssid']]))
-    if not unique_ssids:
-        console.print("[red]Keine benannten Netzwerke gefunden![/red]")
-        return
-        
-    for i, ssid in enumerate(unique_ssids):
-        console.print(f"[{i+1}] {ssid}")
-        
-    choice = Prompt.ask("Wähle ein Netzwerk zur Beobachtung", choices=[str(i+1) for i in range(len(unique_ssids))])
-    target_ssid = unique_ssids[int(choice)-1]
-    
-    console.print(f"\n[bold green]Starte Live-Tracking für '{target_ssid}'... (Abbruch mit Strg+C)[/bold green]")
-    
     from rich.live import Live
     from rich.progress import Progress, BarColumn, TextColumn
+    import time
     
-    progress = Progress(
-        TextColumn("[bold blue]{task.description}"),
-        BarColumn(bar_width=40),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TextColumn("{task.fields[dbm_text]}")
-    )
-    
-    task_id = progress.add_task(target_ssid, total=100, dbm_text="Messung läuft...")
-    
-    try:
-        with Live(progress, refresh_per_second=2, screen=False):
-            while True:
-                try:
-                    nets = scanner.scan_wifi()
-                    target_net = next((n for n in nets if n['ssid'] == target_ssid), None)
-                    if target_net:
-                        dbm = target_net.get('dbm', -100)
-                        progress_val = max(0, min(100, (dbm + 100) * 2))
-                        
-                        color = "red"
-                        if dbm >= -65:
-                            color = "green"
-                        elif dbm >= -80:
-                            color = "yellow"
+    while True:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        console.print(Panel("[bold cyan]=== Positionierungs-Assistent ===[/bold cyan]\n[dim]Wähle ein Netzwerk aus, um die Signalstärke beim Herumlaufen in Echtzeit zu messen.[/dim]", box=box.ROUNDED, border_style="cyan"))
+        scanner = NetworkScanner()
+        
+        networks = scanner.scan_wifi()
+        if not networks:
+            console.print("[red]Keine Netzwerke gefunden![/red]")
+            return
+            
+        unique_ssids = list(set([n['ssid'] for n in networks if n['ssid']]))
+        if not unique_ssids:
+            console.print("[red]Keine benannten Netzwerke gefunden![/red]")
+            return
+            
+        for i, ssid in enumerate(unique_ssids):
+            console.print(f"  [bold yellow][{i+1}][/bold yellow] {ssid}")
+        
+        console.print(f"  [bold red][0][/bold red] Zurück zum Hauptmenü")
+            
+        choice = Prompt.ask("\nWelches Netzwerk möchtest du tracken?", choices=[str(i) for i in range(len(unique_ssids)+1)])
+        if choice == "0":
+            break
+            
+        target_ssid = unique_ssids[int(choice)-1]
+        
+        console.print(f"\n[bold green]Starte Live-Tracking für '{target_ssid}'... (Abbruch und Netzwerkauswahl mit Strg+C)[/bold green]")
+        
+        progress = Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(bar_width=40),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("{task.fields[dbm_text]}")
+        )
+        
+        task_id = progress.add_task(target_ssid, total=100, dbm_text="Messung läuft...")
+        
+        try:
+            with Live(progress, refresh_per_second=2, screen=False):
+                while True:
+                    try:
+                        nets = scanner.scan_wifi()
+                        target_net = next((n for n in nets if n['ssid'] == target_ssid), None)
+                        if target_net:
+                            dbm = target_net.get('dbm', -100)
+                            progress_val = max(0, min(100, (dbm + 100) * 2))
                             
-                        progress.update(
-                            task_id, 
-                            completed=progress_val,
-                            dbm_text=f"[{color}]{dbm} dBm[/]",
-                            description=f"[bold blue]{target_ssid} (Kanal {target_net['channel']})"
-                        )
-                    else:
-                        progress.update(task_id, completed=0, dbm_text="[red]Nicht gefunden[/red]")
-                except Exception:
-                    pass
-                time.sleep(2)
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Live-Tracking beendet.[/yellow]")
+                            color = "red"
+                            if dbm >= -60:
+                                color = "green"
+                            elif dbm >= -75:
+                                color = "yellow"
+                                
+                            progress.update(
+                                task_id, 
+                                completed=progress_val,
+                                dbm_text=f"[{color}]{dbm} dBm[/]",
+                                description=f"[bold blue]{target_ssid} (Kanal {target_net['channel']})"
+                            )
+                        else:
+                            progress.update(task_id, completed=0, dbm_text="[red]Nicht gefunden[/red]")
+                    except Exception:
+                        pass
+                    time.sleep(2)
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Tracking beendet.[/yellow]")
+            time.sleep(1)
 
 @app.command()
 def quick_portscan():
