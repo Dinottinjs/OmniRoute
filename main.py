@@ -140,34 +140,69 @@ def manual_config():
 @app.command()
 def interactive():
     """Startet OmniRoute im interaktiven UI-Modus."""
+    options = [
+        "Nach Updates suchen",
+        "WLAN-Umgebung scannen (Spektrum)",
+        "Netzwerk-Topologie anzeigen (Geräte, Router, Switches)",
+        "KI-Analyse (Pros & Contras)",
+        "Manuelle Router-Konfiguration",
+        "Beenden"
+    ]
+    selected_idx = 0
+    
     while True:
+        # UI-Zeichenschleife für die Pfeiltasten-Navigation
+        while True:
+            os.system('cls' if os.name == 'nt' else 'clear')
+            
+            title = Text("🌐 OmniRoute (AetherNet) Multi-Tool 🌐", style="bold cyan")
+            
+            table = Table(show_header=False, box=None, padding=(0, 2))
+            table.add_column("Cursor", justify="right", style="bold yellow")
+            table.add_column("Option", style="white")
+            
+            for i, opt in enumerate(options):
+                if i == selected_idx:
+                    # Hervorgehobene Auswahl
+                    table.add_row(">", f"[black on white] {opt} [/black on white]")
+                else:
+                    if i == len(options) - 1:
+                        table.add_row(" ", f"[red]{opt}[/red]")
+                    else:
+                        table.add_row(" ", opt)
+            
+            panel = Panel(
+                Align.center(table),
+                title=title,
+                subtitle="© 2026 Maximilian Holzer",
+                border_style="cyan",
+                padding=(1, 4)
+            )
+            console.print(panel)
+            console.print(Align.center("\n[dim]Nutze die Pfeiltasten (↑/↓) zum Navigieren und drücke ENTER.[/dim]"))
+            
+            # Tasten-Eingabe lesen (Windows-spezifisch)
+            if os.name == 'nt':
+                import msvcrt
+                key = ord(msvcrt.getch())
+                if key == 224: # Prefix für Spezialtasten
+                    key = ord(msvcrt.getch())
+                    if key == 72: # Pfeil hoch
+                        selected_idx = (selected_idx - 1) % len(options)
+                    elif key == 80: # Pfeil runter
+                        selected_idx = (selected_idx + 1) % len(options)
+                elif key == 13: # Enter
+                    break
+            else:
+                # Fallback für andere OS (nur zur Sicherheit, falls nicht Windows)
+                choice = Prompt.ask("\n[bold yellow]Bitte wähle eine Aktion (1-6)[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default="6")
+                selected_idx = int(choice) - 1
+                break
+                
         os.system('cls' if os.name == 'nt' else 'clear')
         
-        title = Text("🌐 OmniRoute (AetherNet) Multi-Tool 🌐", style="bold cyan")
-        
-        table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("Option", style="bold green", justify="right")
-        table.add_column("Description", style="white")
-        
-        table.add_row("[1]", "Nach Updates suchen")
-        table.add_row("[2]", "WLAN-Umgebung scannen (Spektrum)")
-        table.add_row("[3]", "Netzwerk-Topologie anzeigen (Geräte, Router, Switches)")
-        table.add_row("[4]", "KI-Analyse (Pros & Contras)")
-        table.add_row("[5]", "Manuelle Router-Konfiguration")
-        table.add_row("[6]", "[red]Beenden[/red]")
-        
-        panel = Panel(
-            Align.center(table),
-            title=title,
-            subtitle="© 2026 Maximilian Holzer",
-            border_style="cyan",
-            padding=(1, 4)
-        )
-        console.print(panel)
-        
-        choice = Prompt.ask("\n[bold yellow]Bitte wähle eine Aktion[/bold yellow]", choices=["1", "2", "3", "4", "5", "6"], default="6")
-        
-        os.system('cls' if os.name == 'nt' else 'clear')
+        # Ausführen der gewählten Aktion
+        choice = str(selected_idx + 1)
         if choice == "1":
             update()
         elif choice == "2":
