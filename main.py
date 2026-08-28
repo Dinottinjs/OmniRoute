@@ -210,7 +210,7 @@ def interactive():
         elif choice == "3":
             scan_topology()
         elif choice == "4":
-            optimize()
+            optimize(router_ip=None)
         elif choice == "5":
             manual_config()
         elif choice == "6":
