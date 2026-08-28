@@ -340,17 +340,17 @@ def interactive():
     color_offset = 0
     
     while True:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        console.print(Align.center("\n[dim]Nutze die Pfeiltasten (↑/↓) zum Navigieren und drücke ENTER.[/dim]"))
-        
+        # Kein cls mehr nötig, da screen=True den Alternate Buffer nutzt
         if os.name == 'nt':
             import msvcrt
             choice_made = False
             
-            with Live(generate_main_menu(selected_idx, color_offset), refresh_per_second=15, screen=False) as live:
+            # auto_refresh=False und screen=True verhindert das Flackern in cmd.exe komplett!
+            with Live(generate_main_menu(selected_idx, color_offset), auto_refresh=False, screen=True) as live:
                 while not choice_made:
                     color_offset = (color_offset + 1) % 7
-                    live.update(generate_main_menu(selected_idx, color_offset))
+                    # Manuelles Refreshing, genau synchron zur Schleife
+                    live.update(generate_main_menu(selected_idx, color_offset), refresh=True)
                     
                     if msvcrt.kbhit():
                         key = ord(msvcrt.getch())
@@ -363,9 +363,10 @@ def interactive():
                         elif key == 13: # enter
                             choice_made = True
                             
-                    time.sleep(0.06)
+                    time.sleep(0.1) # 10 FPS reichen für eine flüssige Animation ohne Flackern
         else:
             # Fallback
+            os.system('clear')
             console.print(generate_main_menu(selected_idx, 0))
             choice = Prompt.ask(f"\n[bold yellow]Bitte wähle eine Aktion (1-{len(options)})[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default=str(len(options)))
             selected_idx = int(choice) - 1
