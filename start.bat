@@ -27,6 +27,10 @@ echo       Starte OmniRoute (AetherNet)
 echo ===========================================
 echo.
 
+echo Lade neueste Version herunter...
+git pull origin main
+echo.
+
 :: Prüfen, ob virtuelles Environment existiert, falls nicht erstellen und Abhängigkeiten installieren
 if not exist "venv\" (
     echo Virtuelles Environment nicht gefunden. Erstelle venv...
