@@ -120,17 +120,30 @@ class NetworkScanner:
 
     def scan_topology(self):
         """Führt einen lokalen Netzwerk-Scan durch Auslesen der ARP-Tabelle durch (ohne externe Npcap-Abhängigkeiten)."""
+        import concurrent.futures
+        
         devices = []
         gateway_ip = self.find_gateway()
         if not gateway_ip:
             return []
             
         try:
-            if self.os_type == "Windows":
-                # Quick broadcast ping to populate ARP cache
-                subnet = gateway_ip.rsplit('.', 1)[0]
-                subprocess.run(["ping", "-n", "1", "-w", "200", f"{subnet}.255"], capture_output=True)
+            subnet = gateway_ip.rsplit('.', 1)[0]
+            ips_to_scan = [f"{subnet}.{i}" for i in range(1, 255)]
+            
+            def ping_target(ip_addr):
+                if self.os_type == "Windows":
+                    # Sehr kurzer Timeout (300ms), da wir nur den ARP-Request triggern wollen, 
+                    # selbst wenn ICMP von Firewalls blockiert wird!
+                    subprocess.run(["ping", "-n", "1", "-w", "300", ip_addr], capture_output=True)
+                else:
+                    subprocess.run(["ping", "-c", "1", "-W", "1", ip_addr], capture_output=True)
+                    
+            # 50 Threads parallel pingen lassen -> dauert insgesamt nur ca. 1.5 bis 2 Sekunden
+            with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+                executor.map(ping_target, ips_to_scan)
                 
+            if self.os_type == "Windows":
                 result = subprocess.run(["arp", "-a"], capture_output=True, text=True)
                 for line in result.stdout.split('\n'):
                     line = line.strip()
@@ -145,9 +158,7 @@ class NetworkScanner:
                                 devices.append({'ip': ip, 'mac': mac})
                                 
             else:
-                # Linux/macOS
-                subnet = gateway_ip.rsplit('.', 1)[0]
-                subprocess.run(["ping", "-c", "1", "-W", "1", f"{subnet}.255"], capture_output=True)
+                # Linux/macOS ARP Cache auslesen
                 result = subprocess.run(["arp", "-an"], capture_output=True, text=True)
                 for line in result.stdout.split('\n'):
                     match = re.search(r'\((.*?)\) at ([0-9a-fA-F:]+)', line)

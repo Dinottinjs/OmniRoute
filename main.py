@@ -96,8 +96,9 @@ def scan_topology():
     else:
         console.print("[red]Standard-Gateway konnte nicht ermittelt werden.[/red]")
         
-    devices = scanner.scan_topology()
-    
+    with Status("[cyan]Führe aktiven Ping-Sweep durch, um alle Geräte im Netzwerk aufzuspüren... (ca. 2 Sekunden)[/cyan]", spinner="dots"):
+        devices = scanner.scan_topology()
+        
     console.print(f"\n[bold green]Netzwerkgeräte gefunden: {len(devices)}[/bold green]")
     
     table = Table(title="🕸️ Lokale Netzwerk-Topologie", show_header=True, header_style="bold white on purple", box=box.ROUNDED)
