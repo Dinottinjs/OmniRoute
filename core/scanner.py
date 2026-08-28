@@ -114,30 +114,44 @@ class NetworkScanner:
         return networks
 
     def scan_topology(self):
-        """Führt einen ARP-Scan im lokalen Subnetz (meist /24) durch."""
-        try:
-            import scapy.all as scapy
-        except ImportError:
-            return [{"ip": "Error", "mac": "Scapy nicht installiert"}]
-            
+        """Führt einen lokalen Netzwerk-Scan durch Auslesen der ARP-Tabelle durch (ohne externe Npcap-Abhängigkeiten)."""
+        devices = []
         gateway_ip = self.find_gateway()
         if not gateway_ip:
             return []
             
-        # Wir nehmen vereinfacht ein /24 Subnetz an
-        target_ip = gateway_ip.rsplit('.', 1)[0] + '.0/24'
-        
         try:
-            arp = scapy.ARP(pdst=target_ip)
-            ether = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
-            packet = ether/arp
+            if self.os_type == "Windows":
+                # Quick broadcast ping to populate ARP cache
+                subnet = gateway_ip.rsplit('.', 1)[0]
+                subprocess.run(["ping", "-n", "1", "-w", "200", f"{subnet}.255"], capture_output=True)
+                
+                result = subprocess.run(["arp", "-a"], capture_output=True, text=True)
+                for line in result.stdout.split('\n'):
+                    line = line.strip()
+                    # Typical windows arp -a line: 192.168.1.1       00-11-22-33-44-55     dynamisch
+                    if len(line) > 0 and not line.startswith("Schnittstelle") and not line.startswith("Interface") and not line.startswith("Internetadresse"):
+                        parts = line.split()
+                        if len(parts) >= 2 and parts[0].count('.') == 3 and parts[1].count('-') == 5:
+                            ip = parts[0]
+                            mac = parts[1]
+                            # Filter out multicast/broadcast addresses
+                            if ip != "255.255.255.255" and not ip.startswith("224.") and not ip.startswith("239.") and not ip.endswith(".255"):
+                                devices.append({'ip': ip, 'mac': mac})
+                                
+            else:
+                # Linux/macOS
+                subnet = gateway_ip.rsplit('.', 1)[0]
+                subprocess.run(["ping", "-c", "1", "-W", "1", f"{subnet}.255"], capture_output=True)
+                result = subprocess.run(["arp", "-an"], capture_output=True, text=True)
+                for line in result.stdout.split('\n'):
+                    match = re.search(r'\((.*?)\) at ([0-9a-fA-F:]+)', line)
+                    if match:
+                        devices.append({'ip': match.group(1), 'mac': match.group(2)})
+                        
+            # Filter duplicates
+            unique_devices = {dev['ip']: dev['mac'] for dev in devices}
+            return [{'ip': ip, 'mac': mac} for ip, mac in unique_devices.items()]
             
-            # Senden und Empfangen der Pakete
-            result = scapy.srp(packet, timeout=2, verbose=0)[0]
-            
-            devices = []
-            for sent, received in result:
-                devices.append({'ip': received.psrc, 'mac': received.hwsrc})
-            return devices
         except Exception as e:
-            return [{"ip": "Error", "mac": f"Fehler (Admin-Rechte prüfen?): {e}"}]
+            return [{"ip": "Error", "mac": f"Fehler bei ARP-Scan: {e}"}]
