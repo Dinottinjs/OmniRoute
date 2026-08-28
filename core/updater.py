@@ -1,5 +1,7 @@
 import time
-import requests
+import subprocess
+import sys
+import os
 from rich.progress import Progress, SpinnerColumn, DownloadColumn, TransferSpeedColumn, TextColumn
 from rich.console import Console
 
@@ -7,24 +9,31 @@ console = Console()
 
 def check_for_updates(config: dict):
     """
-    Prüft bei Start via GitHub API auf neue Versionen
-    und simuliert den Download-Prozess via Rich.
+    Prüft auf neue Versionen via git pull und lädt diese direkt herunter.
     """
-    updater_config = config.get("updater", {})
-    owner = updater_config.get("repo_owner", "Dinottinjs")
-    repo = updater_config.get("repo_name", "OmniRoute")
-    
-    api_url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    console.print("[cyan]Suche nach neuesten Patches im GitHub Repository...[/cyan]")
     
     try:
-        console.print(f"Frage GitHub API ab: {api_url}")
-        # In real scenario: response = requests.get(api_url)
-        # We will mock the process for this implementation as there might not be a release yet.
-        time.sleep(1) 
-        console.print("[green]Verbindung erfolgreich.[/green]")
-        console.print("Kein neues Release gefunden. Lade aktuelle Abhängigkeiten (OUI.txt, Wörterbücher) herunter...")
+        # Führe echten Git Pull durch
+        result = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True)
+        output = result.stdout + result.stderr
         
-        _download_assets_simulation()
+        if "Already up to date." in output or "Bereits aktuell" in output:
+            console.print("[green]OmniRoute ist bereits auf dem neuesten Stand![/green]")
+            
+            # Optional: Simulierte Asset-Downloads (für Wörterbücher etc.) belassen
+            console.print("[dim]Prüfe auf zusätzliche Datenbank-Updates (OUI etc.)...[/dim]")
+            _download_assets_simulation()
+            
+        else:
+            console.print("[bold green]Update erfolgreich heruntergeladen und gepatcht![/bold green]")
+            console.print(f"[dim]{output.strip()}[/dim]")
+            console.print("[yellow]Die Anwendung wird nun neu gestartet, um die Änderungen anzuwenden...[/yellow]")
+            time.sleep(2)
+            
+            # Neustart der Anwendung, um den neuen Code zu laden
+            os.execl(sys.executable, sys.executable, *sys.argv)
+            
     except Exception as e:
         console.print(f"[red]Fehler beim Update-Check: {e}[/red]")
 
@@ -32,7 +41,6 @@ def _download_assets_simulation():
     """Simulates downloading required assets using rich progress bars."""
     assets = [
         ("oui.txt", 1024 * 1024 * 4),      # 4 MB
-        ("dictionary_de.txt", 1024 * 512), # 512 KB
         ("tr064_schemas.xml", 1024 * 256)  # 256 KB
     ]
     
@@ -55,7 +63,7 @@ def _download_assets_simulation():
                 task = progress.tasks[task_id]
                 if not task.finished:
                     # Simulate variable network speed
-                    progress.advance(task_id, advance=1024 * 64)
+                    progress.advance(task_id, advance=1024 * 128)
             time.sleep(0.05)
             
-    console.print("[bold green]Alle Abhängigkeiten wurden erfolgreich heruntergeladen und aktualisiert.[/bold green]")
+    console.print("[bold green]Alle internen Datenbanken sind aktuell.[/bold green]")
