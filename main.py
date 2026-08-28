@@ -111,12 +111,17 @@ def scan_topology():
     for idx, dev in enumerate(devices):
         ip = dev.get('ip', 'Error')
         mac = dev.get('mac', '')
+        hostname = dev.get('hostname', 'Unbekannt')
         
-        icon = "💻 Gerät"
+        if hostname != "Unbekannt":
+            icon = f"💻 {hostname}"
+        else:
+            icon = "💻 Unbekanntes Gerät"
+            
         row_style = "white"
         
         if ip == gateway_ip:
-            icon = "🌐 Router/Gateway"
+            icon = f"🌐 {hostname if hostname != 'Unbekannt' else 'Router/Gateway'}"
             row_style = "bold green"
         elif "Error" in ip:
             icon = "❌ Fehler"

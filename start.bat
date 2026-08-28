@@ -1,50 +1,60 @@
 @echo off
-:: Batch-Skript für OmniRoute - Fordert Administratorrechte an und startet die App
+setlocal
+chcp 65001 >nul
+title OmniRoute (AetherNet) - Installer & Launcher
+echo ========================================================
+echo       🌐 OmniRoute (AetherNet) Multi-Tool 🌐
+echo       © 2026 Maximilian Holzer
+echo ========================================================
+echo.
 
-:: Prüfen auf Administratorrechte
-net session >nul 2>&1
-if %errorLevel% == 0 (
-    echo Administratorrechte erfolgreich geprueft.
-) else (
-    echo Fordere Administratorrechte an...
-    goto UACPrompt
+set "TARGET_DIR=OmniRoute_Stable_Build"
+
+IF NOT EXIST "%TARGET_DIR%" (
+    echo [Info] Ordner "%TARGET_DIR%" nicht gefunden.
+    echo [Info] Lade OmniRoute aus dem offiziellen Repository herunter...
+    
+    where git >nul 2>&1
+    IF %ERRORLEVEL% NEQ 0 (
+        echo [Fehler] Git ist auf diesem System nicht installiert!
+        echo Bitte installiere Git (https://git-scm.com/) um OmniRoute herunterzuladen.
+        pause
+        exit /b 1
+    )
+    
+    git clone https://github.com/Dinottinjs/OmniRoute.git "%TARGET_DIR%"
+    IF %ERRORLEVEL% NEQ 0 (
+        echo [Fehler] Fehler beim Herunterladen von OmniRoute.
+        pause
+        exit /b 1
+    )
+    echo [Info] Download erfolgreich!
 )
 
-goto StartApp
+cd "%TARGET_DIR%"
 
-:UACPrompt
-    echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
-    echo UAC.ShellExecute "cmd.exe", "/c ""%~s0""", "", "runas", 1 >> "%temp%\getadmin.vbs"
-    "%temp%\getadmin.vbs"
-    del "%temp%\getadmin.vbs"
-    exit /B
-
-:StartApp
-cd /d "%~dp0"
-echo.
-echo ===========================================
-echo       Starte OmniRoute (AetherNet)
-echo       (c) 2026 Maximilian Holzer
-echo ===========================================
-echo.
-
-echo Lade neueste Version herunter...
-git pull origin main
-echo.
-
-:: Prüfen, ob virtuelles Environment existiert, falls nicht erstellen und Abhängigkeiten installieren
-if not exist "venv\" (
-    echo Virtuelles Environment nicht gefunden. Erstelle venv...
+IF NOT EXIST "venv" (
+    echo [Info] Erstelle virtuelle Python-Umgebung...
     python -m venv venv
-    call venv\Scripts\activate.bat
-    echo Installiere Abhaengigkeiten...
+    IF %ERRORLEVEL% NEQ 0 (
+        echo [Fehler] Fehler bei der Erstellung der virtuellen Umgebung. Ist Python installiert?
+        pause
+        exit /b 1
+    )
+    
+    echo [Info] Installiere Abhängigkeiten...
+    call venv\Scripts\activate
     pip install -r requirements.txt
-    playwright install
-) else (
-    call venv\Scripts\activate.bat
+    IF %ERRORLEVEL% NEQ 0 (
+        echo [Fehler] Fehler bei der Installation der Abhängigkeiten.
+        pause
+        exit /b 1
+    )
+) ELSE (
+    call venv\Scripts\activate
 )
 
-:: App starten
-echo Starte OmniRoute CLI...
+echo.
+echo [Info] OmniRoute wird gestartet...
 python main.py interactive
-cmd /k
+pause

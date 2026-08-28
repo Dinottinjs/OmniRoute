@@ -165,9 +165,25 @@ class NetworkScanner:
                     if match:
                         devices.append({'ip': match.group(1), 'mac': match.group(2)})
                         
-            # Filter duplicates
+            # Filter duplicates and extract unique devices
             unique_devices = {dev['ip']: dev['mac'] for dev in devices}
-            return [{'ip': ip, 'mac': mac} for ip, mac in unique_devices.items()]
+            result_devices = [{'ip': ip, 'mac': mac} for ip, mac in unique_devices.items()]
+            
+            # Hostnames auflösen (Multithreaded für maximale Geschwindigkeit)
+            import socket
+            def resolve_hostname(device):
+                try:
+                    # Kurzes Timeout, damit Geräte ohne Hostname nicht blockieren
+                    socket.setdefaulttimeout(0.3)
+                    hostname = socket.gethostbyaddr(device['ip'])[0]
+                    device['hostname'] = hostname
+                except Exception:
+                    device['hostname'] = "Unbekannt"
+                    
+            with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
+                executor.map(resolve_hostname, result_devices)
+                
+            return result_devices
             
         except Exception as e:
             return [{"ip": "Error", "mac": f"Fehler bei ARP-Scan: {e}"}]
