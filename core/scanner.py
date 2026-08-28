@@ -183,14 +183,14 @@ class NetworkScanner:
         """Misst die Latenz (Ping) zu einem Host und gibt sie in ms zurück."""
         try:
             if self.os_type == "Windows":
-                result = subprocess.run(["ping", "-n", "1", "-w", "1000", host], capture_output=True, text=True)
+                result = subprocess.run(["ping", "-n", "1", "-w", "1000", host], capture_output=True, text=True, encoding='cp850', errors='ignore')
                 # Parse: Zeit=12ms or time=12ms or Zeit<1ms
                 match = re.search(r"Zeit[=<](\d+)ms|time[=<](\d+)ms", result.stdout, re.IGNORECASE)
                 if match:
                     val = match.group(1) if match.group(1) else match.group(2)
                     return int(val)
             else:
-                result = subprocess.run(["ping", "-c", "1", "-W", "1", host], capture_output=True, text=True)
+                result = subprocess.run(["ping", "-c", "1", "-W", "1", host], capture_output=True, text=True, errors='ignore')
                 match = re.search(r"time=(\d+\.?\d*) ms", result.stdout)
                 if match:
                     return int(float(match.group(1)))

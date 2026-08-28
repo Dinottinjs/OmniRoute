@@ -14,25 +14,31 @@ def check_for_updates(config: dict):
     console.print("[cyan]Suche nach neuesten Patches im GitHub Repository...[/cyan]")
     
     try:
-        # Führe echten Git Pull durch
-        result = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True, timeout=15)
-        output = result.stdout + result.stderr
+        # Führe Git Fetch durch, um den Remote-Status zu holen
+        subprocess.run(["git", "fetch", "origin", "main"], capture_output=True, text=True, timeout=15)
         
-        if "Already up to date." in output or "Bereits aktuell" in output:
+        # Vergleiche lokale und remote Version
+        local_hash = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        remote_hash = subprocess.run(["git", "rev-parse", "origin/main"], capture_output=True, text=True).stdout.strip()
+        
+        if local_hash != remote_hash and remote_hash != "":
+            # Zwinge das lokale Repo auf den exakten Stand von origin/main
+            result = subprocess.run(["git", "reset", "--hard", "origin/main"], capture_output=True, text=True, timeout=15)
+            
+            console.print("[bold green]Update erfolgreich heruntergeladen und gepatcht![/bold green]")
+            console.print(f"[dim]{result.stdout.strip()}[/dim]")
+            console.print("[yellow]Die Anwendung wird nun neu gestartet, um die Änderungen anzuwenden...[/yellow]")
+            time.sleep(2)
+            
+            # Neustart der Anwendung in den interaktiven Modus
+            os.execl(sys.executable, sys.executable, sys.argv[0], "interactive")
+            
+        else:
             console.print("[green]OmniRoute ist bereits auf dem neuesten Stand![/green]")
             
             # Optional: Simulierte Asset-Downloads (für Wörterbücher etc.) belassen
             console.print("[dim]Prüfe auf zusätzliche Datenbank-Updates (OUI etc.)...[/dim]")
             _download_assets_simulation()
-            
-        else:
-            console.print("[bold green]Update erfolgreich heruntergeladen und gepatcht![/bold green]")
-            console.print(f"[dim]{output.strip()}[/dim]")
-            console.print("[yellow]Die Anwendung wird nun neu gestartet, um die Änderungen anzuwenden...[/yellow]")
-            time.sleep(2)
-            
-            # Neustart der Anwendung, um den neuen Code zu laden
-            os.execl(sys.executable, sys.executable, *sys.argv)
             
     except Exception as e:
         console.print(f"[red]Fehler beim Update-Check: {e}[/red]")

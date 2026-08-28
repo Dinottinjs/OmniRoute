@@ -331,7 +331,7 @@ def interactive():
         return Panel(
             Align.center(table),
             title=title,
-            subtitle="© 2026 Maximilian Holzer",
+            subtitle="© 2026 Maximilian Holzer | [dim]Navigation: ↑/↓ und ENTER[/dim]",
             border_style="cyan",
             padding=(1, 4)
         )
@@ -340,30 +340,27 @@ def interactive():
     color_offset = 0
     
     while True:
-        # Kein cls mehr nötig, da screen=True den Alternate Buffer nutzt
         if os.name == 'nt':
             import msvcrt
             choice_made = False
             
-            # auto_refresh=False und screen=True verhindert das Flackern in cmd.exe komplett!
-            with Live(generate_main_menu(selected_idx, color_offset), auto_refresh=False, screen=True) as live:
-                while not choice_made:
-                    color_offset = (color_offset + 1) % 7
-                    # Manuelles Refreshing, genau synchron zur Schleife
-                    live.update(generate_main_menu(selected_idx, color_offset), refresh=True)
+            while not choice_made:
+                os.system('cls')
+                console.print(generate_main_menu(selected_idx, color_offset))
+                
+                # Blockierendes Warten auf Tastendruck (100% flimmerfrei im Leerlauf)
+                key = ord(msvcrt.getch())
+                if key == 224:
+                    key = ord(msvcrt.getch())
+                    if key == 72: # up
+                        selected_idx = (selected_idx - 1) % len(options)
+                    elif key == 80: # down
+                        selected_idx = (selected_idx + 1) % len(options)
                     
-                    if msvcrt.kbhit():
-                        key = ord(msvcrt.getch())
-                        if key == 224:
-                            key = ord(msvcrt.getch())
-                            if key == 72: # up
-                                selected_idx = (selected_idx - 1) % len(options)
-                            elif key == 80: # down
-                                selected_idx = (selected_idx + 1) % len(options)
-                        elif key == 13: # enter
-                            choice_made = True
-                            
-                    time.sleep(0.1) # 10 FPS reichen für eine flüssige Animation ohne Flackern
+                    # Rainbow-Farbe nur bei Bewegung durchschalten
+                    color_offset = (color_offset + 1) % 7
+                elif key == 13: # enter
+                    choice_made = True
         else:
             # Fallback
             os.system('clear')
