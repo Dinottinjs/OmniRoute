@@ -1,5 +1,9 @@
 import typer
 from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Prompt
+from rich.align import Align
+from rich.text import Text
 from core.updater import check_for_updates
 from core.scanner import NetworkScanner
 from core.agent import RouterAgent
@@ -71,6 +75,52 @@ def optimize(
     
     console.print("\n[bold green]KI-Empfehlung:[/bold green]")
     console.print(recommendation)
+
+@app.command()
+def interactive():
+    """Startet OmniRoute im interaktiven UI-Modus."""
+    while True:
+        os.system('cls' if os.name == 'nt' else 'clear')
+        
+        title = Text("OmniRoute (AetherNet) - Universal Wi-Fi Router Multi-Tool", style="bold cyan")
+        menu = Text("\n", justify="left")
+        menu.append(" [1] ", style="bold green")
+        menu.append("Nach Updates suchen\n")
+        menu.append(" [2] ", style="bold green")
+        menu.append("Lokales Netzwerk & WLAN scannen\n")
+        menu.append(" [3] ", style="bold green")
+        menu.append("Router mit KI optimieren (Ratgeber)\n")
+        menu.append(" [4] ", style="bold green")
+        menu.append("Router mit KI optimieren (Auto-Modus)\n")
+        menu.append(" [5] ", style="bold red")
+        menu.append("Beenden\n")
+        
+        panel = Panel(Align.center(menu), title=title, border_style="cyan", padding=(1, 2))
+        console.print(panel)
+        
+        choice = Prompt.ask("\n[bold yellow]Wähle eine Option[/bold yellow]", choices=["1", "2", "3", "4", "5"], default="5")
+        
+        os.system('cls' if os.name == 'nt' else 'clear')
+        if choice == "1":
+            update()
+        elif choice == "2":
+            scan()
+        elif choice == "3":
+            try:
+                optimize(mode="manual")
+            except typer.Exit:
+                pass
+        elif choice == "4":
+            try:
+                optimize(mode="auto")
+            except typer.Exit:
+                pass
+        elif choice == "5":
+            console.print("[bold green]Auf Wiedersehen![/bold green]")
+            break
+            
+        console.print("\n[dim]Drücke Enter, um zum Menü zurückzukehren...[/dim]")
+        input()
 
 if __name__ == "__main__":
     app()

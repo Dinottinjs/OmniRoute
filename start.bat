@@ -41,5 +41,5 @@ if not exist "venv\" (
 
 :: App starten
 echo Starte OmniRoute CLI...
-python main.py --help
+python main.py interactive
 cmd /k
