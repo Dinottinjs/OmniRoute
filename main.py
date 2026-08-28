@@ -225,7 +225,11 @@ def positioning_assistant():
         
         console.print(f"  [bold red][0][/bold red] Zurück zum Hauptmenü")
             
-        choice = Prompt.ask("\nWelches Netzwerk möchtest du tracken?", choices=[str(i) for i in range(len(unique_ssids)+1)])
+        try:
+            choice = Prompt.ask("\nWelches Netzwerk möchtest du tracken?", choices=[str(i) for i in range(len(unique_ssids)+1)])
+        except (KeyboardInterrupt, EOFError):
+            break
+            
         if choice == "0":
             break
             
@@ -279,7 +283,12 @@ def quick_portscan():
     console.print("[bold cyan]=== Quick-Portscan ===[/bold cyan]")
     scanner = NetworkScanner()
     
-    ip = Prompt.ask("Gib die Ziel-IP-Adresse ein (z.B. 192.168.1.1)")
+    try:
+        ip = Prompt.ask("Gib die Ziel-IP-Adresse ein (z.B. 192.168.1.1)")
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[yellow]Abgebrochen.[/yellow]")
+        return
+        
     console.print(f"[cyan]Scanne häufige Admin-Ports auf {ip}...[/cyan]")
     
     with Status("[cyan]Scanner läuft...[/cyan]", spinner="dots"):
@@ -295,7 +304,11 @@ def latency_monitor():
     """Startet einen Live-Ping Monitor."""
     console.print("[bold cyan]=== Live-Latenz & Internet-Monitor ===[/bold cyan]")
     scanner = NetworkScanner()
-    host = Prompt.ask("Ziel-Host (Enter für Google DNS)", default="8.8.8.8")
+    try:
+        host = Prompt.ask("Ziel-Host (Enter für Google DNS)", default="8.8.8.8")
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[yellow]Abgebrochen.[/yellow]")
+        return
     
     console.print(f"\n[bold green]Starte Live-Tracking für '{host}'... (Abbruch mit Strg+C)[/bold green]")
     
@@ -447,8 +460,8 @@ def interactive():
         console.print("\n[dim]Drücke Enter, um zum Menü zurückzukehren...[/dim]")
         try:
             input()
-        except EOFError:
-            break
+        except (EOFError, KeyboardInterrupt):
+            pass
 
 if __name__ == "__main__":
     app()
