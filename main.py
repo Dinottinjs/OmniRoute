@@ -17,6 +17,9 @@ from adapters.web_generic import GenericWebScraperAdapter
 import json
 import os
 import sys
+import time
+import concurrent.futures
+from rich.status import Status
 
 app = typer.Typer(help="OmniRoute (AetherNet) - Universal Wi-Fi Router Multi-Tool")
 console = Console()
@@ -47,9 +50,11 @@ def scan_wifi():
     table.add_column("SSID")
     table.add_column("Kanal", justify="right")
     table.add_column("Signal", justify="right")
+    table.add_column("dBm", justify="right")
     
     for net in networks:
-        table.add_row(net['ssid'], str(net['channel']), f"{net['signal']}%")
+        dbm = net.get('dbm', '?')
+        table.add_row(net['ssid'], str(net['channel']), f"{net['signal']}%", f"{dbm} dBm")
     console.print(table)
 
 @app.command()
@@ -96,7 +101,16 @@ def optimize(router_ip: str = typer.Option(None, help="IP-Adresse des Routers"))
     console.print("[cyan]Sammle Daten und sende sie an die KI...[/cyan]")
     current_router_config = {"gateway_ip": router_ip}
     
-    recommendation = agent.analyze(networks, current_router_config)
+    start_time = time.time()
+    recommendation = ""
+    with Status("[cyan]KI-Analyse läuft... (0s)[/cyan]", spinner="dots") as status:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(agent.analyze, networks, current_router_config)
+            while not future.done():
+                elapsed = int(time.time() - start_time)
+                status.update(f"[cyan]KI-Analyse läuft... ({elapsed}s)[/cyan]")
+                time.sleep(0.5)
+            recommendation = future.result()
     
     console.print("\n[bold green]KI-Netzwerkanalyse (Pros & Contras):[/bold green]")
     console.print(Panel(recommendation, border_style="green", title="Analyse-Ergebnis"))
@@ -141,6 +155,72 @@ def manual_config():
         console.print("[red]Login fehlgeschlagen. Bitte Zugangsdaten und IP prüfen![/red]")
 
 @app.command()
+def positioning_assistant():
+    """Startet ein Live-Radar zur Router-Positionierung (dBm Messung)."""
+    console.print("[bold cyan]=== Positionierungs-Assistent ===[/bold cyan]")
+    scanner = NetworkScanner()
+    
+    networks = scanner.scan_wifi()
+    if not networks:
+        console.print("[red]Keine Netzwerke gefunden![/red]")
+        return
+        
+    unique_ssids = list(set([n['ssid'] for n in networks if n['ssid']]))
+    if not unique_ssids:
+        console.print("[red]Keine benannten Netzwerke gefunden![/red]")
+        return
+        
+    for i, ssid in enumerate(unique_ssids):
+        console.print(f"[{i+1}] {ssid}")
+        
+    choice = Prompt.ask("Wähle ein Netzwerk zur Beobachtung", choices=[str(i+1) for i in range(len(unique_ssids))])
+    target_ssid = unique_ssids[int(choice)-1]
+    
+    console.print(f"\n[bold green]Starte Live-Tracking für '{target_ssid}'... (Abbruch mit Strg+C)[/bold green]")
+    
+    from rich.live import Live
+    from rich.progress import Progress, BarColumn, TextColumn
+    
+    progress = Progress(
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(bar_width=40),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        TextColumn("{task.fields[dbm_text]}")
+    )
+    
+    task_id = progress.add_task(target_ssid, total=100, dbm_text="Messung läuft...")
+    
+    try:
+        with Live(progress, refresh_per_second=2, screen=False):
+            while True:
+                try:
+                    nets = scanner.scan_wifi()
+                    target_net = next((n for n in nets if n['ssid'] == target_ssid), None)
+                    if target_net:
+                        dbm = target_net.get('dbm', -100)
+                        progress_val = max(0, min(100, (dbm + 100) * 2))
+                        
+                        color = "red"
+                        if dbm >= -65:
+                            color = "green"
+                        elif dbm >= -80:
+                            color = "yellow"
+                            
+                        progress.update(
+                            task_id, 
+                            completed=progress_val,
+                            dbm_text=f"[{color}]{dbm} dBm[/]",
+                            description=f"[bold blue]{target_ssid} (Kanal {target_net['channel']})"
+                        )
+                    else:
+                        progress.update(task_id, completed=0, dbm_text="[red]Nicht gefunden[/red]")
+                except Exception:
+                    pass
+                time.sleep(2)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Live-Tracking beendet.[/yellow]")
+
+@app.command()
 def interactive():
     """Startet OmniRoute im interaktiven UI-Modus."""
     options = [
@@ -148,6 +228,7 @@ def interactive():
         "WLAN-Umgebung scannen (Spektrum)",
         "Netzwerk-Topologie anzeigen (Geräte, Router, Switches)",
         "KI-Analyse (Pros & Contras)",
+        "Positionierungs-Assistent (Live dBm-Radar)",
         "Manuelle Router-Konfiguration",
         "Beenden"
     ]
@@ -198,7 +279,7 @@ def interactive():
                     break
             else:
                 # Fallback für andere OS (nur zur Sicherheit, falls nicht Windows)
-                choice = Prompt.ask("\n[bold yellow]Bitte wähle eine Aktion (1-6)[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default="6")
+                choice = Prompt.ask(f"\n[bold yellow]Bitte wähle eine Aktion (1-{len(options)})[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default=str(len(options)))
                 selected_idx = int(choice) - 1
                 break
                 
@@ -215,8 +296,10 @@ def interactive():
         elif choice == "4":
             optimize(router_ip=None)
         elif choice == "5":
-            manual_config()
+            positioning_assistant()
         elif choice == "6":
+            manual_config()
+        elif choice == "7":
             console.print("[bold green]Auf Wiedersehen![/bold green]")
             sys.exit(0)
             

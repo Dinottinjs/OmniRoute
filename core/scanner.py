@@ -63,6 +63,7 @@ class NetworkScanner:
                     elif line.startswith("Signal"):
                         signal_str = line.split(":")[1].strip().replace("%", "")
                         signal = int(signal_str) if signal_str.isdigit() else 0
+                        dbm = int((signal / 2) - 100)
                     elif line.startswith("Kanal") or line.startswith("Channel"):
                         channel_str = line.split(":")[1].strip()
                         channel = int(channel_str) if channel_str.isdigit() else 0
@@ -70,6 +71,7 @@ class NetworkScanner:
                             networks.append({
                                 "ssid": current_ssid,
                                 "signal": signal,
+                                "dbm": dbm,
                                 "channel": channel
                             })
             except Exception as e:
@@ -89,7 +91,8 @@ class NetworkScanner:
                         if match:
                             networks.append({
                                 "ssid": match.group(1).strip(),
-                                "signal": int(match.group(3)), # RSSI
+                                "signal": 0, # RSSI percent placeholder
+                                "dbm": int(match.group(3)),
                                 "channel": int(match.group(4))
                             })
             except Exception:
@@ -103,9 +106,11 @@ class NetworkScanner:
                     if line.strip():
                         parts = line.split(':')
                         if len(parts) == 3:
+                            signal_val = int(parts[1]) if parts[1].isdigit() else 0
                             networks.append({
                                 "ssid": parts[0],
-                                "signal": int(parts[1]) if parts[1].isdigit() else 0,
+                                "signal": signal_val,
+                                "dbm": int((signal_val / 2) - 100),
                                 "channel": int(parts[2]) if parts[2].isdigit() else 0
                             })
             except Exception:
