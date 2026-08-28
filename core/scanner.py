@@ -197,3 +197,45 @@ class NetworkScanner:
         except Exception:
             pass
         return -1
+
+    def get_live_signal(self, target_ssid: str) -> int:
+        """
+        Gibt die Echtzeit-Signalstärke in dBm für eine SSID zurück.
+        Auf Windows wird die verbundene SSID live ohne Caching abgefragt.
+        """
+        if self.os_type == "Windows":
+            try:
+                result = subprocess.run(["netsh", "wlan", "show", "interfaces"], capture_output=True, text=True, encoding='cp850', errors='ignore')
+                connected_ssid = None
+                dbm = -100
+                
+                for line in result.stdout.split('\n'):
+                    line = line.strip()
+                    if line.startswith("SSID") and not line.startswith("SSID-") and not line.startswith("BSSID"):
+                        parts = line.split(":", 1)
+                        if len(parts) > 1:
+                            connected_ssid = parts[1].strip()
+                    elif line.startswith("RSSI"):
+                        parts = line.split(":")
+                        if len(parts) > 1:
+                            rssi_str = parts[1].strip()
+                            if rssi_str.lstrip('-').isdigit():
+                                dbm = int(rssi_str)
+                    elif line.startswith("Signal") and dbm == -100:
+                        parts = line.split(":")
+                        if len(parts) > 1:
+                            sig_str = parts[1].strip().replace("%", "")
+                            if sig_str.isdigit():
+                                dbm = int((int(sig_str) / 2) - 100)
+                                
+                if connected_ssid == target_ssid and dbm != -100:
+                    return dbm
+            except Exception:
+                pass
+                
+        # Fallback auf gecachten Scan (oder macOS/Linux)
+        nets = self.scan_wifi()
+        target = next((n for n in nets if n['ssid'] == target_ssid), None)
+        if target:
+            return target.get('dbm', -100)
+        return -100

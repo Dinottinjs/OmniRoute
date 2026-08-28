@@ -207,7 +207,7 @@ def positioning_assistant():
     
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
-        console.print(Panel("[bold cyan]=== Positionierungs-Assistent ===[/bold cyan]\n[dim]Wähle ein Netzwerk aus, um die Signalstärke beim Herumlaufen in Echtzeit zu messen.[/dim]", box=box.ROUNDED, border_style="cyan"))
+        console.print(Panel("[bold cyan]=== Positionierungs-Assistent ===[/bold cyan]\n[dim]Wähle ein Netzwerk aus, um die Signalstärke beim Herumlaufen in Echtzeit zu messen.\n[yellow]Tipp für Windows-Nutzer:[/yellow] Verbinde dich vorher mit dem Ziel-WLAN, um absolute Echtzeit-Daten (60 FPS) ohne Cache zu erhalten![/dim]", box=box.ROUNDED, border_style="cyan"))
         scanner = NetworkScanner()
         
         networks = scanner.scan_wifi()
@@ -250,10 +250,9 @@ def positioning_assistant():
             with Live(progress, refresh_per_second=2, screen=False):
                 while True:
                     try:
-                        nets = scanner.scan_wifi()
-                        target_net = next((n for n in nets if n['ssid'] == target_ssid), None)
-                        if target_net:
-                            dbm = target_net.get('dbm', -100)
+                        dbm = scanner.get_live_signal(target_ssid)
+                        
+                        if dbm != -100:
                             progress_val = max(0, min(100, (dbm + 100) * 2))
                             
                             color = "red"
@@ -266,7 +265,7 @@ def positioning_assistant():
                                 task_id, 
                                 completed=progress_val,
                                 dbm_text=f"[{color}]{dbm} dBm[/]",
-                                description=f"[bold blue]{target_ssid} (Kanal {target_net['channel']})"
+                                description=f"[bold blue]{target_ssid}"
                             )
                         else:
                             progress.update(task_id, completed=0, dbm_text="[red]Nicht gefunden[/red]")
