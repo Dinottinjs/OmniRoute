@@ -221,90 +221,183 @@ def positioning_assistant():
         console.print("\n[yellow]Live-Tracking beendet.[/yellow]")
 
 @app.command()
+def quick_portscan():
+    """Startet einen TCP-Portscan."""
+    console.print("[bold cyan]=== Quick-Portscan ===[/bold cyan]")
+    scanner = NetworkScanner()
+    
+    ip = Prompt.ask("Gib die Ziel-IP-Adresse ein (z.B. 192.168.1.1)")
+    console.print(f"[cyan]Scanne häufige Admin-Ports auf {ip}...[/cyan]")
+    
+    with Status("[cyan]Scanner läuft...[/cyan]", spinner="dots"):
+        open_ports = scanner.port_scan(ip)
+        
+    if open_ports:
+        console.print(f"[bold green]Gefundene offene Ports:[/bold green] {', '.join(map(str, open_ports))}")
+    else:
+        console.print("[yellow]Keine gängigen offenen Ports gefunden.[/yellow]")
+
+@app.command()
+def latency_monitor():
+    """Startet einen Live-Ping Monitor."""
+    console.print("[bold cyan]=== Live-Latenz & Internet-Monitor ===[/bold cyan]")
+    scanner = NetworkScanner()
+    host = Prompt.ask("Ziel-Host (Enter für Google DNS)", default="8.8.8.8")
+    
+    console.print(f"\n[bold green]Starte Live-Tracking für '{host}'... (Abbruch mit Strg+C)[/bold green]")
+    
+    from rich.live import Live
+    
+    def generate_ping_table(pings):
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Ziel")
+        table.add_column("Aktueller Ping")
+        table.add_column("Jitter (Schwankung)")
+        table.add_column("Status")
+        
+        if not pings:
+            table.add_row(host, "...", "...", "...")
+            return table
+            
+        current = pings[-1]
+        if current < 0:
+            table.add_row(host, "[red]Timeout[/red]", "...", "[red]Offline[/red]")
+            return table
+            
+        jitter = 0
+        if len(pings) > 1:
+            valid_pings = [p for p in pings[-5:] if p >= 0]
+            if len(valid_pings) > 1:
+                jitter = int(abs(valid_pings[-1] - valid_pings[-2]))
+                
+        status = "[green]Exzellent[/green]" if current < 30 else "[yellow]Gut[/yellow]" if current < 80 else "[red]Schlecht[/red]"
+        table.add_row(host, f"{current} ms", f"{jitter} ms", status)
+        return table
+
+    pings = []
+    try:
+        with Live(generate_ping_table(pings), refresh_per_second=2, screen=False) as live:
+            while True:
+                try:
+                    latency = scanner.ping_measure(host)
+                    pings.append(latency)
+                    if len(pings) > 10:
+                        pings.pop(0)
+                    live.update(generate_ping_table(pings))
+                except Exception:
+                    pass
+                time.sleep(1)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Ping-Monitor beendet.[/yellow]")
+
+@app.command()
 def interactive():
-    """Startet OmniRoute im interaktiven UI-Modus."""
+    """Startet OmniRoute im interaktiven Rainbow-UI-Modus."""
     options = [
         "Nach Updates suchen",
         "WLAN-Umgebung scannen (Spektrum)",
         "Netzwerk-Topologie anzeigen (Geräte, Router, Switches)",
+        "Latenz & Internet-Stabilität prüfen",
+        "Quick-Portscan für Endgeräte",
         "KI-Analyse (Pros & Contras)",
         "Positionierungs-Assistent (Live dBm-Radar)",
         "Manuelle Router-Konfiguration",
         "Beenden"
     ]
+    
+    from rich.live import Live
+    
+    def generate_main_menu(selected_idx, color_offset):
+        colors = ["red", "orange3", "yellow", "green", "blue", "magenta", "purple"]
+        
+        title_text = "🌐 OmniRoute (AetherNet) Multi-Tool 🌐"
+        title = Text()
+        for i, char in enumerate(title_text):
+            title.append(char, style=f"bold {colors[(i + color_offset) % len(colors)]}")
+            
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column("Cursor", justify="right", style="bold yellow")
+        table.add_column("Option", style="white")
+        
+        for i, opt in enumerate(options):
+            if i == selected_idx:
+                table.add_row(">", f"[black on white] {opt} [/black on white]")
+            else:
+                if i == len(options) - 1:
+                    table.add_row(" ", f"[red]{opt}[/red]")
+                else:
+                    table.add_row(" ", opt)
+                    
+        return Panel(
+            Align.center(table),
+            title=title,
+            subtitle="© 2026 Maximilian Holzer",
+            border_style="cyan",
+            padding=(1, 4)
+        )
+
     selected_idx = 0
+    color_offset = 0
     
     while True:
-        # UI-Zeichenschleife für die Pfeiltasten-Navigation
-        while True:
-            os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls' if os.name == 'nt' else 'clear')
+        console.print(Align.center("\n[dim]Nutze die Pfeiltasten (↑/↓) zum Navigieren und drücke ENTER.[/dim]"))
+        
+        if os.name == 'nt':
+            import msvcrt
+            choice_made = False
             
-            title = Text("🌐 OmniRoute (AetherNet) Multi-Tool 🌐", style="bold cyan")
+            with Live(generate_main_menu(selected_idx, color_offset), refresh_per_second=15, screen=False) as live:
+                while not choice_made:
+                    color_offset = (color_offset + 1) % 7
+                    live.update(generate_main_menu(selected_idx, color_offset))
+                    
+                    if msvcrt.kbhit():
+                        key = ord(msvcrt.getch())
+                        if key == 224:
+                            key = ord(msvcrt.getch())
+                            if key == 72: # up
+                                selected_idx = (selected_idx - 1) % len(options)
+                            elif key == 80: # down
+                                selected_idx = (selected_idx + 1) % len(options)
+                        elif key == 13: # enter
+                            choice_made = True
+                            
+                    time.sleep(0.06)
+        else:
+            # Fallback
+            console.print(generate_main_menu(selected_idx, 0))
+            choice = Prompt.ask(f"\n[bold yellow]Bitte wähle eine Aktion (1-{len(options)})[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default=str(len(options)))
+            selected_idx = int(choice) - 1
             
-            table = Table(show_header=False, box=None, padding=(0, 2))
-            table.add_column("Cursor", justify="right", style="bold yellow")
-            table.add_column("Option", style="white")
-            
-            for i, opt in enumerate(options):
-                if i == selected_idx:
-                    # Hervorgehobene Auswahl
-                    table.add_row(">", f"[black on white] {opt} [/black on white]")
-                else:
-                    if i == len(options) - 1:
-                        table.add_row(" ", f"[red]{opt}[/red]")
-                    else:
-                        table.add_row(" ", opt)
-            
-            panel = Panel(
-                Align.center(table),
-                title=title,
-                subtitle="© 2026 Maximilian Holzer",
-                border_style="cyan",
-                padding=(1, 4)
-            )
-            console.print(panel)
-            console.print(Align.center("\n[dim]Nutze die Pfeiltasten (↑/↓) zum Navigieren und drücke ENTER.[/dim]"))
-            
-            # Tasten-Eingabe lesen (Windows-spezifisch)
-            if os.name == 'nt':
-                import msvcrt
-                key = ord(msvcrt.getch())
-                if key == 224: # Prefix für Spezialtasten
-                    key = ord(msvcrt.getch())
-                    if key == 72: # Pfeil hoch
-                        selected_idx = (selected_idx - 1) % len(options)
-                    elif key == 80: # Pfeil runter
-                        selected_idx = (selected_idx + 1) % len(options)
-                elif key == 13: # Enter
-                    break
-            else:
-                # Fallback für andere OS (nur zur Sicherheit, falls nicht Windows)
-                choice = Prompt.ask(f"\n[bold yellow]Bitte wähle eine Aktion (1-{len(options)})[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default=str(len(options)))
-                selected_idx = int(choice) - 1
-                break
-                
         os.system('cls' if os.name == 'nt' else 'clear')
         
-        # Ausführen der gewählten Aktion
-        choice = str(selected_idx + 1)
-        if choice == "1":
+        # Execute action
+        if selected_idx == 0:
             update()
-        elif choice == "2":
+        elif selected_idx == 1:
             scan_wifi()
-        elif choice == "3":
+        elif selected_idx == 2:
             scan_topology()
-        elif choice == "4":
+        elif selected_idx == 3:
+            latency_monitor()
+        elif selected_idx == 4:
+            quick_portscan()
+        elif selected_idx == 5:
             optimize(router_ip=None)
-        elif choice == "5":
+        elif selected_idx == 6:
             positioning_assistant()
-        elif choice == "6":
+        elif selected_idx == 7:
             manual_config()
-        elif choice == "7":
+        elif selected_idx == 8:
             console.print("[bold green]Auf Wiedersehen![/bold green]")
             sys.exit(0)
             
         console.print("\n[dim]Drücke Enter, um zum Menü zurückzukehren...[/dim]")
-        input()
+        try:
+            input()
+        except EOFError:
+            break
 
 if __name__ == "__main__":
     app()

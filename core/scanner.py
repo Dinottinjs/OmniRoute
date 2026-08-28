@@ -160,3 +160,40 @@ class NetworkScanner:
             
         except Exception as e:
             return [{"ip": "Error", "mac": f"Fehler bei ARP-Scan: {e}"}]
+
+    def port_scan(self, ip: str, ports: list = None):
+        """Führt einen schnellen TCP-Portscan durch."""
+        import socket
+        if ports is None:
+            # Häufige Router/Admin/Web-Ports
+            ports = [21, 22, 80, 443, 8080, 8443, 7547, 5000]
+        open_ports = []
+        for port in ports:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.settimeout(0.5)
+                    result = s.connect_ex((ip, port))
+                    if result == 0:
+                        open_ports.append(port)
+            except Exception:
+                pass
+        return open_ports
+
+    def ping_measure(self, host="1.1.1.1"):
+        """Misst die Latenz (Ping) zu einem Host und gibt sie in ms zurück."""
+        try:
+            if self.os_type == "Windows":
+                result = subprocess.run(["ping", "-n", "1", "-w", "1000", host], capture_output=True, text=True)
+                # Parse: Zeit=12ms or time=12ms or Zeit<1ms
+                match = re.search(r"Zeit[=<](\d+)ms|time[=<](\d+)ms", result.stdout, re.IGNORECASE)
+                if match:
+                    val = match.group(1) if match.group(1) else match.group(2)
+                    return int(val)
+            else:
+                result = subprocess.run(["ping", "-c", "1", "-W", "1", host], capture_output=True, text=True)
+                match = re.search(r"time=(\d+\.?\d*) ms", result.stdout)
+                if match:
+                    return int(float(match.group(1)))
+        except Exception:
+            pass
+        return -1

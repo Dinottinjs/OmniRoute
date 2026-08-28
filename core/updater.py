@@ -15,7 +15,7 @@ def check_for_updates(config: dict):
     
     try:
         # Führe echten Git Pull durch
-        result = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True)
+        result = subprocess.run(["git", "pull", "origin", "main"], capture_output=True, text=True, timeout=15)
         output = result.stdout + result.stderr
         
         if "Already up to date." in output or "Bereits aktuell" in output:

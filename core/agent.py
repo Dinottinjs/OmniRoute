@@ -30,10 +30,8 @@ class RouterAgent:
         user_prompt = f"Gefundene WLAN-Netzwerke in der Umgebung:\n{json.dumps(networks, indent=2)}\n\nAktuelle Router-Konfiguration:\n{json.dumps(router_config, indent=2)}"
         
         try:
-            response = self.client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=f"System: {system_prompt}\n\nUser: {user_prompt}"
-            )
+            chat = self.client.chats.create(model='gemini-2.5-flash')
+            response = chat.send_message(f"System: {system_prompt}\n\nUser: {user_prompt}")
             return response.text
         except Exception as e:
             return f"Fehler bei der KI-Analyse: {e}"
