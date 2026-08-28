@@ -10,21 +10,21 @@ class RouterAgent:
         else:
             self.client = None
 
-    def analyze(self, networks: list, router_config: dict, mode: str = "manual"):
+    def analyze(self, networks: list, router_config: dict):
         """
         Analysiert die Spektrumsdaten und aktuelle Router-Konfiguration
-        und gibt Optimierungsvorschläge zurück.
+        und gibt eine strukturierte Pro/Contra Liste zurück.
         """
         if not self.client:
             return "KI-Optimierung nicht verfügbar. Bitte füge einen gültigen Gemini API-Key in der config.json hinzu."
             
         system_prompt = (
             "Du bist ein leitender Netzwerk-Architekt. Deine Aufgabe ist es, das WLAN-Spektrum "
-            "und die Konfiguration eines lokalen Routers zu analysieren. Berücksichtige Kanalüberlappung "
-            "und Interferenzen (2.4 GHz und 5 GHz). "
-            f"Der Nutzer wünscht den Modus: {mode}. "
-            "Wenn 'manual', gib eine Schritt-für-Schritt-Anleitung für die Weboberfläche. "
-            "Wenn 'auto', generiere eine knappe JSON-Payload zur direkten Anwendung durch die API."
+            "und die Konfiguration eines lokalen Routers zu bewerten. "
+            "Erstelle eine präzise Netzwerkanalyse, in der du kurz die Pros (Stärken, gute Konfiguration) "
+            "und Contras (Kanalüberlappungen, alte Standards, Interferenzen) auflistest. "
+            "Führe KEINE automatisierten Einstellungsänderungen durch, sondern agiere rein beratend. "
+            "Strukturiere deine Antwort übersichtlich mit Aufzählungspunkten (Pro / Contra)."
         )
         
         user_prompt = f"Gefundene WLAN-Netzwerke in der Umgebung:\n{json.dumps(networks, indent=2)}\n\nAktuelle Router-Konfiguration:\n{json.dumps(router_config, indent=2)}"

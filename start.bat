@@ -24,6 +24,7 @@ cd /d "%~dp0"
 echo.
 echo ===========================================
 echo       Starte OmniRoute (AetherNet)
+echo       (c) 2026 Maximilian Holzer
 echo ===========================================
 echo.
 

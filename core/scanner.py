@@ -112,3 +112,32 @@ class NetworkScanner:
                 pass
                 
         return networks
+
+    def scan_topology(self):
+        """Führt einen ARP-Scan im lokalen Subnetz (meist /24) durch."""
+        try:
+            import scapy.all as scapy
+        except ImportError:
+            return [{"ip": "Error", "mac": "Scapy nicht installiert"}]
+            
+        gateway_ip = self.find_gateway()
+        if not gateway_ip:
+            return []
+            
+        # Wir nehmen vereinfacht ein /24 Subnetz an
+        target_ip = gateway_ip.rsplit('.', 1)[0] + '.0/24'
+        
+        try:
+            arp = scapy.ARP(pdst=target_ip)
+            ether = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")
+            packet = ether/arp
+            
+            # Senden und Empfangen der Pakete
+            result = scapy.srp(packet, timeout=2, verbose=0)[0]
+            
+            devices = []
+            for sent, received in result:
+                devices.append({'ip': received.psrc, 'mac': received.hwsrc})
+            return devices
+        except Exception as e:
+            return [{"ip": "Error", "mac": f"Fehler (Admin-Rechte prüfen?): {e}"}]
