@@ -8,9 +8,16 @@ echo        (c) 2026 Maximilian Holzer
 echo ========================================================
 echo.
 
+IF EXIST "main.py" (
+    GOTO CHECK_VENV
+)
+
 set "TARGET_DIR=OmniRoute_Stable_Build"
 
-IF EXIST "%TARGET_DIR%" GOTO RUN_APP
+IF EXIST "%TARGET_DIR%\main.py" (
+    cd "%TARGET_DIR%"
+    GOTO CHECK_VENV
+)
 
 echo [Info] Ordner "%TARGET_DIR%" nicht gefunden.
 echo [Info] Lade OmniRoute aus dem offiziellen Repository herunter...
@@ -36,9 +43,9 @@ IF EXIST "config.json" (
     copy /Y "config.json" "%TARGET_DIR%\config.json" >nul
 )
 
-:RUN_APP
 cd "%TARGET_DIR%"
 
+:CHECK_VENV
 IF EXIST "venv" GOTO START_APP
 
 echo [Info] Erstelle virtuelle Python-Umgebung...
