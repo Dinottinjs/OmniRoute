@@ -420,7 +420,7 @@ def interactive():
         return Panel(
             grid,
             title=title,
-            subtitle="[dim]Navigation: Pfeiltasten (↑/↓) und ENTER[/dim]",
+            subtitle="[dim]Navigation: Pfeiltasten (Hoch/Runter) und ENTER[/dim]",
             border_style=colors[color_offset % len(colors)],
             box=box.DOUBLE_EDGE,
             padding=(1, 2)
