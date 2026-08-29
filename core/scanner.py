@@ -183,6 +183,25 @@ class NetworkScanner:
             with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
                 executor.map(resolve_hostname, result_devices)
                 
+            # Eigenes (Host) Gerät zur Liste hinzufügen
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect((gateway_ip, 1))
+                local_ip = s.getsockname()[0]
+                s.close()
+                
+                import uuid
+                mac_num = hex(uuid.getnode()).replace('0x', '').upper()
+                local_mac = '-'.join(mac_num[i: i + 2] for i in range(0, 11, 2))
+                
+                host_entry = next((d for d in result_devices if d['ip'] == local_ip), None)
+                if not host_entry:
+                    result_devices.insert(0, {'ip': local_ip, 'mac': local_mac, 'hostname': f"{socket.gethostname()} (Dieses Gerät)"})
+                else:
+                    host_entry['hostname'] = f"{socket.gethostname()} (Dieses Gerät)"
+            except Exception:
+                pass
+                
             return result_devices
             
         except Exception as e:

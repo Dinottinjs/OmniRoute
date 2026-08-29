@@ -381,30 +381,49 @@ def interactive():
     def generate_main_menu(selected_idx, color_offset):
         colors = ["red", "orange3", "yellow", "green", "blue", "magenta", "purple"]
         
-        title_text = "🌐 OmniRoute (AetherNet) Multi-Tool 🌐"
+        title_text = "OmniRoute (AetherNet) Multi-Tool"
         title = Text()
         for i, char in enumerate(title_text):
             title.append(char, style=f"bold {colors[(i + color_offset) % len(colors)]}")
             
-        table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("Cursor", justify="right", style="bold yellow")
-        table.add_column("Option", style="white")
+        menu_table = Table(show_header=False, box=None, padding=(0, 2))
+        menu_table.add_column("Cursor", justify="right", style="bold yellow")
+        menu_table.add_column("Option", style="white")
         
         for i, opt in enumerate(options):
             if i == selected_idx:
-                table.add_row(">", f"[black on white] {opt} [/black on white]")
+                menu_table.add_row(">", f"[black on white] {opt} [/black on white]")
             else:
                 if i == len(options) - 1:
-                    table.add_row(" ", f"[red]{opt}[/red]")
+                    menu_table.add_row(" ", f"[red]{opt}[/red]")
                 else:
-                    table.add_row(" ", opt)
+                    menu_table.add_row(" ", opt)
                     
+        menu_panel = Panel(menu_table, title="[bold cyan]Aktionen[/bold cyan]", box=box.ROUNDED, border_style="cyan")
+        
+        info_text = (
+            "\n[bold white]OmniRoute (AetherNet)[/bold white] v1.0\n"
+            "© 2026 Maximilian Holzer\n\n"
+            "[dim]Verbindungsstatus:[/dim] [bold green]Online[/bold green]\n"
+            "[dim]Scanner-Engine:[/dim] [bold blue]Bereit[/bold blue]\n"
+            "[dim]KI-Anbindung:[/dim] [bold purple]Aktiv[/bold purple]\n\n"
+            "[yellow]Tipp:[/yellow] Nutze den Positionierungs-Assistent,\n"
+            "um Signal-Löcher im Haus zu finden!\n"
+        )
+        info_panel = Panel(info_text, title="[bold magenta]System-Status[/bold magenta]", box=box.ROUNDED, border_style="magenta", padding=(1, 2))
+        
+        grid = Table.grid(expand=True, padding=(0, 2))
+        grid.add_column(ratio=2)
+        grid.add_column(ratio=1)
+        grid.add_row(menu_panel, info_panel)
+        
         return Panel(
-            Align.center(table),
+            grid,
             title=title,
-            subtitle="© 2026 Maximilian Holzer | [dim]Navigation: ↑/↓ und ENTER[/dim]",
-            border_style="cyan",
-            padding=(1, 4)
+            subtitle="[dim]Navigation: Pfeiltasten (↑/↓) und ENTER[/dim]",
+            border_style=colors[color_offset % len(colors)],
+            box=box.DOUBLE_EDGE,
+            padding=(1, 2)
         )
 
     selected_idx = 0
