@@ -440,7 +440,7 @@ def interactive():
                 
                 # Blockierendes Warten auf Tastendruck (100% flimmerfrei im Leerlauf)
                 key = ord(msvcrt.getch())
-                if key == 224:
+                if key in (0, 224):
                     key = ord(msvcrt.getch())
                     if key == 72: # up
                         selected_idx = (selected_idx - 1) % len(options)
