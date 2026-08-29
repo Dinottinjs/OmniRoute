@@ -179,12 +179,12 @@ def traceroute_diag():
         console.print("\n[yellow]Abgebrochen.[/yellow]")
         return
         
-    console.print(f"[cyan]Verfolge Route zu {host}... (Dies kann einige Sekunden dauern)[/cyan]")
+    console.print(f"[cyan]Verfolge Route zu {host}... (Abbruch jederzeit mit Strg+C)[/cyan]")
     
     import subprocess
     cmd = ["tracert", host] if os.name == 'nt' else ["traceroute", host]
     
-    with Status("[cyan]Traceroute läuft...[/cyan]", spinner="dots"):
+    with Status("[cyan]Traceroute läuft... (Strg+C zum Abbrechen)[/cyan]", spinner="dots"):
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='cp850' if os.name == 'nt' else 'utf-8', errors='ignore')
         
     console.print(Panel(result.stdout.strip(), border_style="blue", title="Routenverfolgung Ergebnis"))
@@ -437,7 +437,7 @@ def interactive():
         menu_panel = Panel(menu_table, title="[bold cyan]Aktionen[/bold cyan]", box=box.ROUNDED, border_style="cyan")
         
         info_text = (
-            "\n[bold white]OmniRoute (AetherNet)[/bold white] v1.0\n"
+            "\n[bold white]OmniRoute (AetherNet)[/bold white] [gold1]v1.0[/gold1]\n"
             "© 2026 Maximilian Holzer\n\n"
             f"[dim]Verbindungsstatus:[/dim] {conn_status}\n"
             f"[dim]Scanner-Engine:[/dim] [bold blue]Bereit[/bold blue]\n"
@@ -499,25 +499,28 @@ def interactive():
         os.system('cls' if os.name == 'nt' else 'clear')
         
         # Execute action
-        if selected_idx == 0:
-            update()
-        elif selected_idx == 1:
-            scan_wifi()
-        elif selected_idx == 2:
-            scan_topology()
-        elif selected_idx == 3:
-            latency_monitor()
-        elif selected_idx == 4:
-            quick_portscan()
-        elif selected_idx == 5:
-            optimize(router_ip=None)
-        elif selected_idx == 6:
-            positioning_assistant()
-        elif selected_idx == 7:
-            traceroute_diag()
-        elif selected_idx == 8:
-            console.print("[bold green]Auf Wiedersehen![/bold green]")
-            sys.exit(0)
+        try:
+            if selected_idx == 0:
+                update()
+            elif selected_idx == 1:
+                scan_wifi()
+            elif selected_idx == 2:
+                scan_topology()
+            elif selected_idx == 3:
+                latency_monitor()
+            elif selected_idx == 4:
+                quick_portscan()
+            elif selected_idx == 5:
+                optimize(router_ip=None)
+            elif selected_idx == 6:
+                positioning_assistant()
+            elif selected_idx == 7:
+                traceroute_diag()
+            elif selected_idx == 8:
+                console.print("[bold green]Auf Wiedersehen![/bold green]")
+                sys.exit(0)
+        except KeyboardInterrupt:
+            console.print("\n[bold yellow]Aktion durch Benutzer abgebrochen (Strg+C).[/bold yellow]")
             
         console.print("\n[dim]Drücke Enter, um zum Menü zurückzukehren...[/dim]")
         try:
