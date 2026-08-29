@@ -1,10 +1,9 @@
 @echo off
 setlocal EnableDelayedExpansion
-chcp 65001 >nul
 title OmniRoute (AetherNet) - Installer ^& Launcher
 echo ========================================================
-echo       🌐 OmniRoute (AetherNet) Multi-Tool 🌐
-echo       © 2026 Maximilian Holzer
+echo        OmniRoute (AetherNet) Multi-Tool 
+echo        (c) 2026 Maximilian Holzer
 echo ========================================================
 echo.
 
