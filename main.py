@@ -400,7 +400,7 @@ def interactive():
         "Dein eigener PC wird in der Topologie\nmit '(Dieses Gerät)' markiert."
     ]
 
-    def generate_main_menu(selected_idx, color_offset):
+    def generate_main_menu(selected_idx, color_offset, current_tipp):
         colors = ["red", "orange3", "yellow", "green", "blue", "magenta", "purple"]
         
         title_text = "OmniRoute (AetherNet) Multi-Tool"
@@ -429,7 +429,7 @@ def interactive():
             f"[dim]Verbindungsstatus:[/dim] {conn_status}\n"
             f"[dim]Scanner-Engine:[/dim] [bold blue]Bereit[/bold blue]\n"
             f"[dim]KI-Anbindung:[/dim] {ki_status}\n\n"
-            f"[yellow]Tipp:[/yellow] {tipps[selected_idx % len(tipps)]}\n"
+            f"[yellow]Tipp:[/yellow] {current_tipp}\n"
         )
         info_panel = Panel(info_text, title="[bold magenta]System-Status[/bold magenta]", box=box.ROUNDED, border_style="magenta", padding=(1, 2))
         
@@ -453,11 +453,13 @@ def interactive():
     while True:
         if os.name == 'nt':
             import msvcrt
+            import random
+            current_tipp = random.choice(tipps)
             choice_made = False
             
             while not choice_made:
                 os.system('cls')
-                console.print(generate_main_menu(selected_idx, color_offset))
+                console.print(generate_main_menu(selected_idx, color_offset, current_tipp))
                 
                 # Blockierendes Warten auf Tastendruck (100% flimmerfrei im Leerlauf)
                 key = ord(msvcrt.getch())
@@ -474,8 +476,10 @@ def interactive():
                     choice_made = True
         else:
             # Fallback
+            import random
+            current_tipp = random.choice(tipps)
             os.system('clear')
-            console.print(generate_main_menu(selected_idx, 0))
+            console.print(generate_main_menu(selected_idx, 0, current_tipp))
             choice = Prompt.ask(f"\n[bold yellow]Bitte wähle eine Aktion (1-{len(options)})[/bold yellow]", choices=[str(i+1) for i in range(len(options))], default=str(len(options)))
             selected_idx = int(choice) - 1
             
