@@ -102,9 +102,10 @@ def scan_topology():
     console.print(f"\n[bold green]Netzwerkgeräte gefunden: {len(devices)}[/bold green]")
     
     table = Table(title="🕸️ Lokale Netzwerk-Topologie", show_header=True, header_style="bold white on purple", box=box.ROUNDED)
-    table.add_column("Typ", justify="center")
+    table.add_column("Typ / Hostname", justify="left")
     table.add_column("IP Adresse", style="cyan", justify="left")
     table.add_column("MAC Adresse", style="magenta", justify="left")
+    table.add_column("Hersteller", style="yellow", justify="left")
     
     gateway_ip = scanner.find_gateway()
     
@@ -112,6 +113,7 @@ def scan_topology():
         ip = dev.get('ip', 'Error')
         mac = dev.get('mac', '')
         hostname = dev.get('hostname', 'Unbekannt')
+        vendor = dev.get('vendor', 'Unbekannt')
         
         if hostname != "Unbekannt":
             icon = f"💻 {hostname}"
@@ -127,7 +129,7 @@ def scan_topology():
             icon = "❌ Fehler"
             row_style = "red"
             
-        table.add_row(icon, ip, mac, style=row_style)
+        table.add_row(icon, ip, mac, vendor, style=row_style)
         
     console.print(table)
 
@@ -163,46 +165,29 @@ def optimize(router_ip: str = typer.Option(None, help="IP-Adresse des Routers"))
             recommendation = future.result()
     
     console.print("\n[bold green]KI-Netzwerkanalyse (Pros & Contras):[/bold green]")
-    console.print(Panel(recommendation, border_style="green", title="Analyse-Ergebnis"))
+    from rich.markdown import Markdown
+    md = Markdown(recommendation)
+    console.print(Panel(md, border_style="green", title="Analyse-Ergebnis"))
 
 @app.command()
-def manual_config():
-    """Erlaubt manuelle Einstellungsänderungen am Router über die verfügbaren Adapter."""
-    console.print("[bold cyan]=== Manuelle Router-Konfiguration ===[/bold cyan]")
-    scanner = NetworkScanner()
-    default_ip = scanner.find_gateway() or "192.168.1.1"
-    
-    adapter_choice = Prompt.ask("Wähle Adapter (1: TR-064/FritzBox, 2: SSH/OpenWrt, 3: Web-Scraper)", choices=["1", "2", "3"], default="1")
-    ip = Prompt.ask("Router IP", default=default_ip)
-    username = Prompt.ask("Benutzername", default="admin")
-    password = Prompt.ask("Passwort", password=True)
-    
-    adapter = None
-    if adapter_choice == "1":
-        adapter = TR064Adapter(ip)
-    elif adapter_choice == "2":
-        adapter = OpenWrtSSHAdapter(ip)
-    elif adapter_choice == "3":
-        adapter = GenericWebScraperAdapter(ip)
+def traceroute_diag():
+    """Führt ein Traceroute (Routenverfolgung) durch."""
+    console.print("[bold cyan]=== Traceroute & DNS-Diagnose ===[/bold cyan]")
+    try:
+        host = Prompt.ask("Ziel-Host oder IP (Enter für Google DNS)", default="8.8.8.8")
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[yellow]Abgebrochen.[/yellow]")
+        return
         
-    console.print("[yellow]Verbindungsaufbau...[/yellow]")
-    if adapter.login({"username": username, "password": password}):
-        console.print("[green]Erfolgreich am Router eingeloggt![/green]")
-        action = Prompt.ask("Aktion wählen (1: WLAN-Kanal ändern, 2: Router neustarten)", choices=["1", "2"], default="1")
-        if action == "1":
-            band = Prompt.ask("Frequenzband (2.4 oder 5)", default="2.4")
-            channel = int(Prompt.ask("Kanal", default="6"))
-            if adapter.set_channel(band, channel):
-                console.print(f"[green]Kanal für {band}GHz erfolgreich auf {channel} gesetzt![/green]")
-            else:
-                console.print("[red]Fehler beim Setzen des Kanals.[/red]")
-        elif action == "2":
-            if adapter.reboot():
-                console.print("[green]Neustart-Befehl erfolgreich gesendet![/green]")
-            else:
-                console.print("[red]Fehler beim Neustarten.[/red]")
-    else:
-        console.print("[red]Login fehlgeschlagen. Bitte Zugangsdaten und IP prüfen![/red]")
+    console.print(f"[cyan]Verfolge Route zu {host}... (Dies kann einige Sekunden dauern)[/cyan]")
+    
+    import subprocess
+    cmd = ["tracert", host] if os.name == 'nt' else ["traceroute", host]
+    
+    with Status("[cyan]Traceroute läuft...[/cyan]", spinner="dots"):
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='cp850' if os.name == 'nt' else 'utf-8', errors='ignore')
+        
+    console.print(Panel(result.stdout.strip(), border_style="blue", title="Routenverfolgung Ergebnis"))
 
 @app.command()
 def positioning_assistant():
@@ -290,6 +275,7 @@ def quick_portscan():
     
     try:
         ip = Prompt.ask("Gib die Ziel-IP-Adresse ein (z.B. 192.168.1.1)")
+        ports_input = Prompt.ask("Zu scannende Ports (Optional, z.B. 80,443,8000-8010 oder Leer für Standard-Ports)", default="")
     except (KeyboardInterrupt, EOFError):
         console.print("\n[yellow]Abgebrochen.[/yellow]")
         return
@@ -300,10 +286,30 @@ def quick_portscan():
             console.print("[red]Fehler: Die IP-Adresse ist ungültig oder nicht erreichbar![/red]")
             return
             
-    console.print(f"[cyan]Scanne häufige Admin-Ports auf {ip}...[/cyan]")
+    custom_ports = None
+    if ports_input.strip():
+        custom_ports = []
+        for part in ports_input.split(','):
+            part = part.strip()
+            if '-' in part:
+                try:
+                    start_p, end_p = map(int, part.split('-'))
+                    custom_ports.extend(range(start_p, end_p + 1))
+                except ValueError:
+                    pass
+            elif part.isdigit():
+                custom_ports.append(int(part))
+        
+        # Deduplicate and limit to max 1000 ports to avoid hanging
+        custom_ports = list(set(custom_ports))[:1000]
+
+    if custom_ports:
+        console.print(f"[cyan]Scanne {len(custom_ports)} ausgewählte Ports auf {ip}...[/cyan]")
+    else:
+        console.print(f"[cyan]Scanne häufige Admin-Ports auf {ip}...[/cyan]")
     
     with Status("[cyan]Scanner läuft...[/cyan]", spinner="dots"):
-        open_ports = scanner.port_scan(ip)
+        open_ports = scanner.port_scan(ip, ports=custom_ports)
         
     if open_ports:
         console.print(f"[bold green]Gefundene offene Ports:[/bold green] {', '.join(map(str, open_ports))}")
@@ -330,15 +336,22 @@ def latency_monitor():
         table.add_column("Ziel")
         table.add_column("Aktueller Ping")
         table.add_column("Jitter (Schwankung)")
+        table.add_column("Packet Loss")
         table.add_column("Status")
         
         if not pings:
-            table.add_row(host, "...", "...", "...")
+            table.add_row(host, "...", "...", "...", "...")
             return table
             
         current = pings[-1]
+        
+        # Calculate Packet Loss
+        loss_count = sum(1 for p in pings if p < 0)
+        loss_pct = (loss_count / len(pings)) * 100
+        loss_str = f"[green]0.0%[/green]" if loss_pct == 0 else f"[red]{loss_pct:.1f}%[/red]"
+        
         if current < 0:
-            table.add_row(host, "[red]Timeout[/red]", "...", "[red]Offline[/red]")
+            table.add_row(host, "[red]Timeout[/red]", "...", loss_str, "[red]Offline[/red]")
             return table
             
         jitter = 0
@@ -348,7 +361,7 @@ def latency_monitor():
                 jitter = int(abs(valid_pings[-1] - valid_pings[-2]))
                 
         status = "[green]Exzellent[/green]" if current < 30 else "[yellow]Gut[/yellow]" if current < 80 else "[red]Schlecht[/red]"
-        table.add_row(host, f"{current} ms", f"{jitter} ms", status)
+        table.add_row(host, f"{current} ms", f"{jitter} ms", loss_str, status)
         return table
 
     pings = []
@@ -358,7 +371,7 @@ def latency_monitor():
                 try:
                     latency = scanner.ping_measure(host)
                     pings.append(latency)
-                    if len(pings) > 10:
+                    if len(pings) > 50:
                         pings.pop(0)
                     live.update(generate_ping_table(pings))
                 except Exception:
@@ -378,7 +391,7 @@ def interactive():
         "Quick-Portscan für Endgeräte",
         "KI-Analyse (Pros & Contras)",
         "Positionierungs-Assistent (Live dBm-Radar)",
-        "Manuelle Router-Konfiguration",
+        "Traceroute & DNS-Diagnose",
         "Beenden"
     ]
     
@@ -501,7 +514,7 @@ def interactive():
         elif selected_idx == 6:
             positioning_assistant()
         elif selected_idx == 7:
-            manual_config()
+            traceroute_diag()
         elif selected_idx == 8:
             console.print("[bold green]Auf Wiedersehen![/bold green]")
             sys.exit(0)

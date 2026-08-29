@@ -169,16 +169,34 @@ class NetworkScanner:
             unique_devices = {dev['ip']: dev['mac'] for dev in devices}
             result_devices = [{'ip': ip, 'mac': mac} for ip, mac in unique_devices.items()]
             
+            COMMON_OUI = {
+                "B8:27:EB": "Raspberry Pi", "DC:A6:32": "Raspberry Pi", "E4:5F:01": "Raspberry Pi",
+                "00:1A:11": "Google", "3C:5A:B4": "Google", "F4:F5:DB": "Google",
+                "C0:25:06": "AVM (Fritz!Box)", "08:96:D7": "AVM (Fritz!Box)", "34:31:C4": "AVM (Fritz!Box)", 
+                "3C:A6:2F": "AVM (Fritz!Box)", "44:4E:6D": "AVM (Fritz!Box)", "C8:0E:14": "AVM (Fritz!Box)",
+                "FC:AF:6A": "Apple", "00:17:F2": "Apple", "00:1C:B3": "Apple", "00:1E:52": "Apple", 
+                "00:23:12": "Apple", "00:25:BC": "Apple", "F4:0F:24": "Apple", "2C:F0:EE": "Apple",
+                "00:15:6D": "Ubiquiti", "04:18:D6": "Ubiquiti", "18:E8:29": "Ubiquiti", "24:5A:4C": "Ubiquiti",
+                "00:14:22": "Dell", "F8:DB:88": "Dell", "00:1D:09": "Dell", "E0:D5:5E": "Dell",
+                "00:50:56": "VMware", "00:0C:29": "VMware", "00:05:69": "VMware", "08:00:27": "VirtualBox",
+                "00:11:32": "Synology", "A8:5E:45": "Nintendo", "00:18:8E": "Nintendo",
+                "00:22:D7": "Sony", "00:24:8D": "Sony", "00:1A:A9": "Sony",
+                "00:23:CD": "TP-Link", "0C:E3:10": "TP-Link", "14:CC:20": "TP-Link", "50:C7:BF": "TP-Link",
+                "00:E0:4C": "Realtek", "52:54:00": "QEMU", "00:25:9C": "Cisco"
+            }
+            
             # Hostnames auflösen (Multithreaded für maximale Geschwindigkeit)
             import socket
             def resolve_hostname(device):
                 try:
-                    # Kurzes Timeout, damit Geräte ohne Hostname nicht blockieren
                     socket.setdefaulttimeout(0.3)
                     hostname = socket.gethostbyaddr(device['ip'])[0]
                     device['hostname'] = hostname
                 except Exception:
                     device['hostname'] = "Unbekannt"
+                    
+                mac_prefix = str(device['mac']).upper()[:8].replace("-", ":")
+                device['vendor'] = COMMON_OUI.get(mac_prefix, "Unbekannt")
                     
             with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
                 executor.map(resolve_hostname, result_devices)
@@ -211,8 +229,8 @@ class NetworkScanner:
         """Führt einen schnellen TCP-Portscan durch."""
         import socket
         if ports is None:
-            # Häufige Router/Admin/Web-Ports
-            ports = [21, 22, 80, 443, 8080, 8443, 7547, 5000]
+            # Häufige Router/Admin/Web-Ports + RDP, SMB, DNS, NetBIOS
+            ports = [21, 22, 53, 80, 139, 443, 445, 3389, 5000, 7547, 8080, 8443]
         open_ports = []
         for port in ports:
             try:
