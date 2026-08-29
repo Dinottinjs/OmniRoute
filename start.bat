@@ -31,6 +31,11 @@ IF ERRORLEVEL 1 (
 )
 echo [Info] Download erfolgreich!
 
+IF EXIST "config.json" (
+    echo [Info] Kopiere lokale config.json in das Zielverzeichnis...
+    copy /Y "config.json" "%TARGET_DIR%\config.json" >nul
+)
+
 :RUN_APP
 cd "%TARGET_DIR%"
 

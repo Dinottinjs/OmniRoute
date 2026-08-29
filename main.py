@@ -294,6 +294,12 @@ def quick_portscan():
         console.print("\n[yellow]Abgebrochen.[/yellow]")
         return
         
+    with Status("[cyan]Prüfe Erreichbarkeit...[/cyan]", spinner="dots"):
+        import re
+        if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip) or scanner.ping_measure(ip) < 0:
+            console.print("[red]Fehler: Die IP-Adresse ist ungültig oder nicht erreichbar![/red]")
+            return
+            
     console.print(f"[cyan]Scanne häufige Admin-Ports auf {ip}...[/cyan]")
     
     with Status("[cyan]Scanner läuft...[/cyan]", spinner="dots"):
@@ -378,6 +384,22 @@ def interactive():
     
     from rich.live import Live
     
+    config = load_config()
+    api_key = config.get("api_keys", {}).get("gemini", "")
+    ki_status = "[bold green]Aktiv[/bold green]" if api_key else "[bold red]Fehlt (config.json)[/bold red]"
+    
+    scanner = NetworkScanner()
+    gateway = scanner.find_gateway()
+    conn_status = "[bold green]Online[/bold green]" if gateway else "[bold red]Offline[/bold red]"
+    
+    tipps = [
+        "Nutze den Positionierungs-Assistent,\num Signal-Löcher im Haus zu finden!",
+        "Führe einen KI-Scan aus, um\ndein Spektrum optimal zu konfigurieren.",
+        "Der Topologie-Scan findet auch\nversteckte Geräte (z.B. Smart-Home).",
+        "Der Live-Latenz Monitor hilft bei\nder Fehlersuche in Echtzeit.",
+        "Dein eigener PC wird in der Topologie\nmit '(Dieses Gerät)' markiert."
+    ]
+
     def generate_main_menu(selected_idx, color_offset):
         colors = ["red", "orange3", "yellow", "green", "blue", "magenta", "purple"]
         
@@ -404,11 +426,10 @@ def interactive():
         info_text = (
             "\n[bold white]OmniRoute (AetherNet)[/bold white] v1.0\n"
             "© 2026 Maximilian Holzer\n\n"
-            "[dim]Verbindungsstatus:[/dim] [bold green]Online[/bold green]\n"
-            "[dim]Scanner-Engine:[/dim] [bold blue]Bereit[/bold blue]\n"
-            "[dim]KI-Anbindung:[/dim] [bold purple]Aktiv[/bold purple]\n\n"
-            "[yellow]Tipp:[/yellow] Nutze den Positionierungs-Assistent,\n"
-            "um Signal-Löcher im Haus zu finden!\n"
+            f"[dim]Verbindungsstatus:[/dim] {conn_status}\n"
+            f"[dim]Scanner-Engine:[/dim] [bold blue]Bereit[/bold blue]\n"
+            f"[dim]KI-Anbindung:[/dim] {ki_status}\n\n"
+            f"[yellow]Tipp:[/yellow] {tipps[selected_idx % len(tipps)]}\n"
         )
         info_panel = Panel(info_text, title="[bold magenta]System-Status[/bold magenta]", box=box.ROUNDED, border_style="magenta", padding=(1, 2))
         
@@ -421,7 +442,7 @@ def interactive():
             grid,
             title=title,
             subtitle="[dim]Navigation: Pfeiltasten (Hoch/Runter) und ENTER[/dim]",
-            border_style=colors[color_offset % len(colors)],
+            border_style="cyan",
             box=box.DOUBLE_EDGE,
             padding=(1, 2)
         )
