@@ -2,31 +2,35 @@
 
 © 2026 Maximilian Holzer
 
-Universal Wi-Fi Router Multi-Tool & CLI-Agent für Diagnose, Optimierung, Topologie-Scans und Netzwerkverwaltung.
+**Das ultimative Universal Wi-Fi Router & SysAdmin Multi-Tool für Diagnose, Optimierung, Topologie-Scans und Netzwerkverwaltung.**
 
 ---
 
-## ✨ Features
-- 🚀 **1-Klick Installer (start.bat):** Einfaches Herunterladen und Ausführen für Kollegen ohne Vorkenntnisse.
-- 📡 **Live Positionierungs-Assistent:** Radar-Feature zur Echtzeit-Analyse der Signalstärke in Dezibel (dBm) beim Herumlaufen im Haus.
-- 🕸️ **Netzwerk-Topologie Scan:** Aktiver Multithread-Ping-Sweep zur 100% genauen Erkennung *aller* verbundenen Geräte (inkl. intelligenter Hostname-Auflösung 💻).
-- 🤖 **KI-Netzwerkanalyse:** Automatisierte Diagnose und Fehlerbehebung im Netzwerk mithilfe von Google Gemini.
-- 🔄 **In-App Auto-Updater:** Automatisiertes Update-System via Git, um immer auf der neusten Version zu sein.
-- ⚡ **Quick-Portscan & Latenz-Monitor:** Echzeit-Ping und Portscanner für schnelle Fehlerdiagnosen.
-- 🌈 **Modernes Rainbow-UI:** Atemberaubendes Terminal-Design, bedienbar mit Pfeiltasten und extrem flüssig dank `rich`.
+## ✨ Features (SysAdmin Pro Edition)
+- 🚀 **1-Klick Installer (`start.bat`):** Einfaches Herunterladen und Ausführen für Kollegen oder Kunden ohne Vorkenntnisse. Das Skript lädt alles selbst herunter und richtet es isoliert ein.
+- 📡 **Live Positionierungs-Assistent:** Radar-Feature zur Echtzeit-Analyse der Signalstärke in Dezibel (dBm) beim Herumlaufen im Gebäude.
+- 🕸️ **Erweiterter Topologie-Scan:** Aktiver Multithread-Ping-Sweep zur Erkennung *aller* verbundenen Geräte, inklusive Hostname-Auflösung und **MAC-Vendor Lookup (Herstellererkennung)**.
+- 🤖 **KI-Netzwerkanalyse (Gemini):** Automatisierte Diagnose und Fehlerbehebung im Netzwerk mithilfe der Google Gemini Engine – formatiert in wunderschönem Rich-Markdown.
+- 📉 **Live-Latenz & Packet Loss Monitor:** Echtzeit-Darstellung von Ping, Jitter und prozentualem Paketverlust (über ein 50-Ping rollierendes Fenster).
+- ⚡ **Advanced Portscan:** Scanne Endgeräte blitzschnell auf eigene Ports oder Ranges. Standardmäßig werden essenzielle Admin-Ports (RDP, SMB, DNS, NetBIOS) geprüft.
+- 🗺️ **Traceroute & DNS-Diagnose:** Integriertes Routing-Analyse Tool für das einfache Verfolgen von Hops ins Internet.
+- 🔄 **In-App Auto-Updater:** Automatisiertes Update-System via Git.
+- 🌈 **Modernes Rainbow-UI:** Atemberaubendes Terminal-Design, flüssig bedienbar mit Pfeiltasten, sicher abgefangen durch try-except (Keine Abstürze bei Strg+C!).
 
 ---
 
 ## 🛠️ Installation & Start
 
-### ⚡ Für Kollegen & Nutzer (Einfacher Weg)
-Lade dir einfach das Repository herunter oder kopiere die `start.bat`.
+### ⚡ Für Kollegen & Admins (Der einfache Weg)
+Kopiere dir einfach die Datei `start.bat` auf deinen PC oder lade sie herunter.
 Doppelklicke auf die **`start.bat`**. Das Skript:
-1. Lädt automatisch die neueste, stabile Version von OmniRoute herunter.
-2. Installiert alle benötigten Abhängigkeiten.
-3. Startet die Software sofort fehlerfrei.
+1. Erstellt einen sauberen Ordner (`OmniRoute_Stable_Build`).
+2. Lädt automatisch die neueste, stabile Version herunter.
+3. Wenn du vorab eine `config.json` mit deinem API-Key neben die `start.bat` gelegt hast, wird diese automatisch übernommen!
+4. Installiert alle benötigten Abhängigkeiten.
+5. Startet die Software sofort fehlerfrei.
 
-### 💻 Für Entwickler (Manueller Weg)
+### 💻 Für Entwickler (Der manuelle Weg)
 1. Repository klonen:
    ```bash
    git clone https://github.com/Dinottinjs/OmniRoute.git
@@ -36,22 +40,28 @@ Doppelklicke auf die **`start.bat`**. Das Skript:
 2. Virtuelle Umgebung erstellen und Abhängigkeiten installieren:
    ```bash
    python -m venv venv
-   source venv/bin/activate  # Unter Windows: venv\Scripts\activate
+   # Unter Windows: venv\Scripts\activate
+   # Unter Linux/Mac: source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-3. Setup Playwright (falls der Web Scraper Adapter genutzt wird):
-   ```bash
-   playwright install
+3. (Optional) Konfiguration erstellen:
+   Erstelle eine Datei namens `config.json` für die KI-Engine:
+   ```json
+   {
+       "api_keys": {
+           "gemini": "DEIN_API_KEY"
+       }
+   }
    ```
 
-## 🎮 Bedienung
-Führe das Hauptskript interaktiv aus, um in das Menü zu gelangen:
-```bash
-python main.py interactive
-```
+4. Software im interaktiven Menü starten:
+   ```bash
+   python main.py interactive
+   ```
 
-Alternativ kannst du die Hilfe im CLI aufrufen:
-```bash
-python main.py --help
-```
+---
+
+## 🎮 Bedienung & Handling
+Das Tool wurde extrem nutzerfreundlich entwickelt. Du navigierst simpel über die **Pfeiltasten (Hoch/Runter)** und wählst Aktionen mit **ENTER** aus.
+Lang andauernde Vorgänge wie Pings, Scans oder Traceroutes kannst du jederzeit sicher mit **Strg+C** abbrechen, ohne dass das Programm abstürzt. Du landest dann sofort wieder im Hauptmenü.
