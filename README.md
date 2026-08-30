@@ -10,7 +10,7 @@
 - 🚀 **1-Klick Installer (`start.bat`):** Einfaches Herunterladen und Ausführen für Kollegen oder Kunden ohne Vorkenntnisse. Das Skript lädt alles selbst herunter und richtet es isoliert ein.
 - 📡 **Live Positionierungs-Assistent:** Radar-Feature zur Echtzeit-Analyse der Signalstärke in Dezibel (dBm) beim Herumlaufen im Gebäude.
 - 🕸️ **Erweiterter Topologie-Scan:** Aktiver Multithread-Ping-Sweep zur Erkennung *aller* verbundenen Geräte, inklusive Hostname-Auflösung und **MAC-Vendor Lookup (Herstellererkennung)**.
-- 🤖 **KI-Netzwerkanalyse (Gemini):** Automatisierte Diagnose und Fehlerbehebung im Netzwerk mithilfe der Google Gemini Engine – formatiert in wunderschönem Rich-Markdown.
+- 📻 **SDR-Scanner (Software Defined Radio):** Echte I/Q-Datenverarbeitung von RTL-SDR USB-Dongles. Scanne z.B. 433 MHz (Smart-Home) oder 1090 MHz (ADS-B) und beobachte den Pegel (dBFS) absolut in Echtzeit (FFT-basiert).
 - 📉 **Live-Latenz & Packet Loss Monitor:** Echtzeit-Darstellung von Ping, Jitter und prozentualem Paketverlust (über ein 50-Ping rollierendes Fenster).
 - ⚡ **Advanced Portscan:** Scanne Endgeräte blitzschnell auf eigene Ports oder Ranges. Standardmäßig werden essenzielle Admin-Ports (RDP, SMB, DNS, NetBIOS) geprüft.
 - 🗺️ **Traceroute & DNS-Diagnose:** Integriertes Routing-Analyse Tool für das einfache Verfolgen von Hops ins Internet.

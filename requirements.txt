@@ -1,3 +1,5 @@
 typer[all]
 rich
 google-genai
+pyrtlsdr
+numpy

@@ -12,9 +12,6 @@ from rich import box
 from core.updater import check_for_updates
 from core.scanner import NetworkScanner
 from core.agent import RouterAgent
-from adapters.tr064 import TR064Adapter
-from adapters.ssh_generic import OpenWrtSSHAdapter
-from adapters.web_generic import GenericWebScraperAdapter
 import json
 import os
 import sys
@@ -179,15 +176,37 @@ def traceroute_diag():
         console.print("\n[yellow]Abgebrochen.[/yellow]")
         return
         
-    console.print(f"[cyan]Verfolge Route zu {host}... (Abbruch jederzeit mit Strg+C)[/cyan]")
+    console.print(f"[cyan]Verfolge Route zu {host}... (Taste 'q' zum Abbrechen)[/cyan]")
     
     import subprocess
+    import threading
     cmd = ["tracert", host] if os.name == 'nt' else ["traceroute", host]
     
-    with Status("[cyan]Traceroute läuft... (Strg+C zum Abbrechen)[/cyan]", spinner="dots"):
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding='cp850' if os.name == 'nt' else 'utf-8', errors='ignore')
-        
-    console.print(Panel(result.stdout.strip(), border_style="blue", title="Routenverfolgung Ergebnis"))
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='cp850' if os.name == 'nt' else 'utf-8', errors='ignore')
+    
+    def read_output():
+        for line in process.stdout:
+            print(line, end='', flush=True)
+            
+    t = threading.Thread(target=read_output)
+    t.daemon = True
+    t.start()
+    
+    if os.name == 'nt':
+        import msvcrt
+        while process.poll() is None:
+            if msvcrt.kbhit():
+                if msvcrt.getch().lower() == b'q':
+                    process.terminate()
+                    console.print("\n[bold yellow]Traceroute durch Benutzer abgebrochen.[/bold yellow]")
+                    break
+            time.sleep(0.1)
+    else:
+        try:
+            process.wait()
+        except KeyboardInterrupt:
+            process.terminate()
+            console.print("\n[bold yellow]Traceroute durch Benutzer abgebrochen.[/bold yellow]")
 
 @app.command()
 def positioning_assistant():
@@ -381,6 +400,78 @@ def latency_monitor():
         console.print("\n[yellow]Ping-Monitor beendet.[/yellow]")
 
 @app.command()
+def sdr_scanner():
+    """Startet den SDR-Scanner für USB-Dongles."""
+    console.print("[bold cyan]=== SDR-Scanner (RTL-SDR USB-Dongle) ===[/bold cyan]")
+    try:
+        from rtlsdr import RtlSdr
+        import numpy as np
+    except ImportError:
+        console.print("[red]Fehler: Das 'pyrtlsdr' oder 'numpy' Modul fehlt. Bitte installiere die requirements.txt![/red]")
+        return
+        
+    try:
+        sdr = RtlSdr()
+    except Exception as e:
+        console.print("[bold red]Kein RTL-SDR USB-Dongle gefunden![/bold red]")
+        console.print(f"[dim]Bitte stelle sicher, dass der Stick eingesteckt ist und der Zadig WinUSB Treiber installiert ist.\nDetails: {e}[/dim]")
+        return
+        
+    try:
+        freq_input = Prompt.ask("Zielfrequenz in MHz (z.B. 433.92 für Smart-Home, 1090 für ADS-B, 98.0 für FM)", default="433.92")
+        target_freq = float(freq_input) * 1e6
+        
+        sdr.sample_rate = 2.048e6  # 2.048 MHz
+        sdr.center_freq = target_freq
+        sdr.gain = 'auto'
+        
+        console.print(f"\n[bold green]Starte Live-Messung auf {freq_input} MHz... (Taste 'q' zum Abbrechen)[/bold green]")
+        
+        from rich.live import Live
+        from rich.progress import Progress, BarColumn, TextColumn
+        
+        progress = Progress(
+            TextColumn("[bold blue]{task.description}"),
+            BarColumn(bar_width=40),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TextColumn("{task.fields[dbm_text]}")
+        )
+        task_id = progress.add_task(f"Freq: {freq_input} MHz", total=100, dbm_text="Messe...")
+        
+        with Live(progress, refresh_per_second=5, screen=False):
+            while True:
+                if os.name == 'nt':
+                    import msvcrt
+                    if msvcrt.kbhit():
+                        if msvcrt.getch().lower() == b'q':
+                            break
+                        
+                # Read real samples
+                samples = sdr.read_samples(256 * 1024)
+                
+                # Calculate FFT and find peak power
+                fft_data = np.abs(np.fft.fft(samples))
+                fft_data = np.fft.fftshift(fft_data)
+                
+                # Convert to dBFS (estimate)
+                power_dbfs = 20 * np.log10(np.max(fft_data) + 1e-12) - 80  # Simple calibration offset
+                
+                # Normalize for progress bar (-100 dBFS to 0 dBFS)
+                display_val = max(0, min(100, power_dbfs + 100))
+                
+                color = "red" if power_dbfs > -30 else "yellow" if power_dbfs > -60 else "green"
+                progress.update(task_id, completed=display_val, dbm_text=f"[{color}]{power_dbfs:.1f} dBFS[/{color}]")
+                
+                import time
+                time.sleep(0.1)
+                
+    except Exception as e:
+        console.print(f"[red]Fehler bei der SDR-Verarbeitung: {e}[/red]")
+    finally:
+        sdr.close()
+        console.print("\n[bold yellow]SDR-Scanner beendet.[/bold yellow]")
+
+@app.command()
 def interactive():
     """Startet OmniRoute im interaktiven Rainbow-UI-Modus."""
     options = [
@@ -392,6 +483,7 @@ def interactive():
         "KI-Analyse (Pros & Contras)",
         "Positionierungs-Assistent (Live dBm-Radar)",
         "Traceroute & DNS-Diagnose",
+        "SDR-Scanner (RTL-SDR USB-Dongle)",
         "Beenden"
     ]
     
@@ -517,6 +609,8 @@ def interactive():
             elif selected_idx == 7:
                 traceroute_diag()
             elif selected_idx == 8:
+                sdr_scanner()
+            elif selected_idx == 9:
                 console.print("[bold green]Auf Wiedersehen![/bold green]")
                 sys.exit(0)
         except KeyboardInterrupt:
