@@ -44,32 +44,30 @@ def check_for_updates(config: dict):
         console.print(f"[red]Fehler beim Update-Check: {e}[/red]")
 
 def _download_assets_simulation():
-    """Simulates downloading required assets using rich progress bars."""
-    assets = [
-        ("oui.txt", 1024 * 1024 * 4),      # 4 MB
-        ("tr064_schemas.xml", 1024 * 256)  # 256 KB
-    ]
+    """Lädt aktuelle Datenbanken wie die offizielle IEEE OUI-Liste herunter."""
+    console.print("[dim]Prüfe und aktualisiere IEEE OUI Datenbank (MAC Hersteller)...[/dim]")
     
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold blue]{task.description}", justify="right"),
-        "[progress.percentage]{task.percentage:>3.1f}%",
-        "•",
-        DownloadColumn(),
-        "•",
-        TransferSpeedColumn(),
-    ) as progress:
+    try:
+        from mac_vendor_lookup import MacLookup
+        import asyncio
         
-        tasks = []
-        for name, size in assets:
-            tasks.append(progress.add_task(f"Lade {name}...", total=size))
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[bold blue]{task.description}"),
+            "[progress.percentage]{task.percentage:>3.1f}%",
+        ) as progress:
+            task_id = progress.add_task("Lade IEEE OUI.txt herunter...", total=100)
             
-        while not progress.finished:
-            for task_id in tasks:
-                task = progress.tasks[task_id]
-                if not task.finished:
-                    # Simulate variable network speed
-                    progress.advance(task_id, advance=1024 * 128)
-            time.sleep(0.05)
+            # Since update_vendors() is sync but can block, we just run it and manually update the progress to 100
+            # Wait, update_vendors() has an async version `update_vendors()` if it returns a coroutine. 
+            # In mac_vendor_lookup 0.1.12, MacLookup().update_vendors() is synchronous.
+            mac = MacLookup()
+            mac.update_vendors()
             
-    console.print("[bold green]Alle internen Datenbanken sind aktuell.[/bold green]")
+            progress.update(task_id, completed=100)
+            
+        console.print("[bold green]Alle internen Datenbanken sind aktuell.[/bold green]")
+    except ImportError:
+        console.print("[red]Fehler: Das 'mac-vendor-lookup' Modul fehlt. Bitte installiere die requirements.txt![/red]")
+    except Exception as e:
+        console.print(f"[red]Fehler beim Herunterladen der OUI-Datenbank: {e}[/red]")

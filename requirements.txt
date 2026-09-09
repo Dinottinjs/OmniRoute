@@ -1,5 +1,6 @@
 typer[all]
 rich
 google-genai
-pyrtlsdr
-numpy
+mac-vendor-lookup
+speedtest-cli
+netifaces

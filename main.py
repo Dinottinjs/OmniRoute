@@ -400,137 +400,96 @@ def latency_monitor():
         console.print("\n[yellow]Ping-Monitor beendet.[/yellow]")
 
 @app.command()
-def sdr_scanner():
-    """Startet den SDR-Scanner für USB-Dongles."""
-    console.print("[bold cyan]=== SDR-Scanner (RTL-SDR USB-Dongle) ===[/bold cyan]")
+def speedtest_diag():
+    """Führt einen echten Bandbreitentest (Download/Upload/Ping) durch."""
+    console.print("[bold cyan]=== Internet Bandbreiten-Test (Speedtest) ===[/bold cyan]")
     try:
-        from rtlsdr import RtlSdr
-        import numpy as np
+        import speedtest
     except ImportError:
-        console.print("[red]Fehler: Das 'pyrtlsdr' oder 'numpy' Modul fehlt. Bitte installiere die requirements.txt![/red]")
+        console.print("[red]Fehler: Das 'speedtest-cli' Modul fehlt. Bitte starte start.bat neu.[/red]")
         return
         
-    try:
-        sdr = RtlSdr()
-    except Exception as e:
-        console.print("[bold red]Kein RTL-SDR USB-Dongle gefunden![/bold red]")
-        console.print(f"[dim]Bitte stelle sicher, dass der Stick eingesteckt ist und der Zadig WinUSB Treiber installiert ist.\nDetails: {e}[/dim]")
-        return
-        
-    try:
-        freq_input = Prompt.ask("Zielfrequenz in MHz (z.B. 433.92 für Smart-Home, 1090 für ADS-B, 98.0 für FM)", default="433.92")
-        target_freq = float(freq_input) * 1e6
-        
-        sdr.sample_rate = 2.048e6  # 2.048 MHz
-        sdr.center_freq = target_freq
-        sdr.gain = 'auto'
-        
-        console.print(f"\n[bold green]Starte Live-Messung auf {freq_input} MHz... (Taste 'q' zum Abbrechen)[/bold green]")
-        
-        from rich.live import Live
-        from rich.progress import Progress, BarColumn, TextColumn
-        
-        progress = Progress(
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(bar_width=40),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TextColumn("{task.fields[dbm_text]}")
-        )
-        task_id = progress.add_task(f"Freq: {freq_input} MHz", total=100, dbm_text="Messe...")
-        
-        with Live(progress, refresh_per_second=5, screen=False):
-            while True:
-                if os.name == 'nt':
-                    import msvcrt
-                    if msvcrt.kbhit():
-                        if msvcrt.getch().lower() == b'q':
-                            break
-                        
-                # Read real samples
-                samples = sdr.read_samples(256 * 1024)
-                
-                # Calculate FFT and find peak power
-                fft_data = np.abs(np.fft.fft(samples))
-                fft_data = np.fft.fftshift(fft_data)
-                
-                # Convert to dBFS (estimate)
-                power_dbfs = 20 * np.log10(np.max(fft_data) + 1e-12) - 80  # Simple calibration offset
-                
-                # Normalize for progress bar (-100 dBFS to 0 dBFS)
-                display_val = max(0, min(100, power_dbfs + 100))
-                
-                color = "red" if power_dbfs > -30 else "yellow" if power_dbfs > -60 else "green"
-                progress.update(task_id, completed=display_val, dbm_text=f"[{color}]{power_dbfs:.1f} dBFS[/{color}]")
-                
-                import time
-                time.sleep(0.1)
-                
-    except Exception as e:
-        console.print(f"[red]Fehler bei der SDR-Verarbeitung: {e}[/red]")
-    finally:
-        sdr.close()
-        console.print("\n[bold yellow]SDR-Scanner beendet.[/bold yellow]")
-
-@app.command()
-def sdr_hardware_diag():
-    """Liest Hardware-Parameter des RTL-SDR Dongles aus (Antennen-Ping)."""
-    console.print("[bold cyan]=== SDR Hardware-Diagnose (Antennen-Ping) ===[/bold cyan]")
-    try:
-        from rtlsdr import RtlSdr
-    except ImportError:
-        console.print("[red]Fehler: Das 'pyrtlsdr' Modul fehlt.[/red]")
-        return
-        
-    with Status("[cyan]Verbindungsaufbau zum USB-Dongle...[/cyan]", spinner="dots"):
-        import time
-        time.sleep(0.5)
+    with Status("[cyan]Suche besten Server und messe Ping...[/cyan]", spinner="dots"):
         try:
-            sdr = RtlSdr()
+            st = speedtest.Speedtest()
+            st.get_best_server()
+            ping_ms = st.results.ping
         except Exception as e:
-            console.print("[bold red]Kein RTL-SDR Dongle am USB-Port gefunden![/bold red]")
-            console.print(f"[dim]Fehler: {e}[/dim]")
+            console.print(f"[bold red]Konnte keinen Speedtest-Server erreichen: {e}[/bold red]")
             return
             
-    console.print("[bold green]Verbindung erfolgreich hergestellt![/bold green]\n")
+    with Status("[cyan]Messe Download-Geschwindigkeit (kann einige Sekunden dauern)...[/cyan]", spinner="dots"):
+        try:
+            download_speed = st.download() / 1_000_000  # Convert to Mbps
+        except Exception as e:
+            download_speed = 0.0
+            
+    with Status("[cyan]Messe Upload-Geschwindigkeit (kann einige Sekunden dauern)...[/cyan]", spinner="dots"):
+        try:
+            upload_speed = st.upload() / 1_000_000  # Convert to Mbps
+        except Exception as e:
+            upload_speed = 0.0
+            
+    table = Table(title="🚀 Speedtest Ergebnisse", box=box.ROUNDED)
+    table.add_column("Metrik", style="cyan")
+    table.add_column("Wert", justify="right", style="green")
     
-    table = Table(title="📡 Antennen & Tuner Hardware-Parameter", box=box.ROUNDED)
-    table.add_column("Eigenschaft", style="cyan")
-    table.add_column("Wert", style="yellow")
+    table.add_row("Ping (Latenz)", f"{ping_ms:.1f} ms")
+    table.add_row("Download", f"{download_speed:.2f} Mbit/s")
+    table.add_row("Upload", f"{upload_speed:.2f} Mbit/s")
+    table.add_row("Server", f"{st.results.server['sponsor']} ({st.results.server['name']})")
     
-    # Auslesen echter Hardware-Daten
+    console.print(table)
+    console.print("\n[bold green]Bandbreitentest abgeschlossen.[/bold green]")
+
+@app.command()
+def interface_inspector():
+    """Listet alle lokalen Netzwerk-Interfaces und Routing-Informationen auf."""
+    console.print("[bold cyan]=== Netzwerk-Schnittstellen (Interface Inspector) ===[/bold cyan]")
     try:
-        tuner_type = "Unbekannt (Generic RTL2832U)"
-        # Gains
-        gains = sdr.get_gains()
-        gain_str = f"{len(gains)} Stufen ({min(gains)/10.0} dB bis {max(gains)/10.0} dB)" if gains else "Auto AGC"
+        import netifaces
+    except ImportError:
+        console.print("[red]Fehler: Das 'netifaces' Modul fehlt. Bitte starte start.bat neu.[/red]")
+        return
         
-        # Test frequency limits (approximate for typical R820T2)
-        freq_range = "24 MHz - 1766 MHz (Typisch)"
+    table = Table(title="🔌 Lokale Netzwerk-Adapter", box=box.ROUNDED)
+    table.add_column("Interface", style="magenta")
+    table.add_column("MAC-Adresse", style="yellow")
+    table.add_column("IPv4-Adresse", style="green")
+    table.add_column("Netzmaske", style="cyan")
+    
+    interfaces = netifaces.interfaces()
+    for iface in interfaces:
+        addrs = netifaces.ifaddresses(iface)
         
-        table.add_row("Tuner Status", "[green]Online & Aktiv[/green]")
-        table.add_row("Unterstützte Gain-Stufen", gain_str)
-        table.add_row("Empfangsbereich (Freq.)", freq_range)
-        table.add_row("Sample Rate", "Bis zu 3.2 MS/s (Stabil: 2.4 MS/s)")
+        mac = "Unbekannt"
+        if netifaces.AF_LINK in addrs:
+            mac = addrs[netifaces.AF_LINK][0].get('addr', 'Unbekannt')
+            
+        ipv4 = "-"
+        netmask = "-"
+        if netifaces.AF_INET in addrs:
+            ipv4 = addrs[netifaces.AF_INET][0].get('addr', '-')
+            netmask = addrs[netifaces.AF_INET][0].get('netmask', '-')
+            
+        # Wir blenden reine Loopback/Leere Interfaces ohne IP meistens aus, 
+        # außer sie haben eine MAC, aber für Übersichtlichkeit zeigen wir alle aktiven.
+        if ipv4 != "-" or mac != "Unbekannt":
+            table.add_row(str(iface), str(mac), str(ipv4), str(netmask))
+            
+    console.print(table)
+    
+    # Default Gateway
+    try:
+        gws = netifaces.gateways()
+        default_gw = gws.get('default', {})
+        if netifaces.AF_INET in default_gw:
+            gw_ip, gw_iface = default_gw[netifaces.AF_INET]
+            console.print(f"\n[bold white]Standard-Gateway (Router):[/bold white] [bold green]{gw_ip}[/bold green] auf Interface [magenta]{gw_iface}[/magenta]")
+    except Exception:
+        pass
         
-        console.print(table)
-        
-        # Live Test
-        console.print("\n[cyan]Führe lokalen Signal-Test (Live-Rauschen) durch...[/cyan]")
-        sdr.sample_rate = 2.048e6
-        sdr.center_freq = 100e6  # 100 MHz als Test
-        sdr.gain = 'auto'
-        
-        samples = sdr.read_samples(256 * 1024)
-        import numpy as np
-        power = 10 * np.log10(np.var(samples) + 1e-12)
-        
-        console.print(f"Antennen Rausch-Pegel (100 MHz): [bold {'green' if power > -60 else 'yellow'}]{power:.1f} dBFS[/bold]")
-        console.print("\n[green]Diagnose abgeschlossen. Hardware ist zu 100% einsatzbereit.[/green]")
-        
-    except Exception as e:
-        console.print(f"[red]Fehler beim Auslesen: {e}[/red]")
-    finally:
-        sdr.close()
+    console.print("\n[bold green]Interface-Inspektion abgeschlossen.[/bold green]")
 
 @app.command()
 def interactive():
@@ -551,10 +510,10 @@ def interactive():
             ]
         },
         {
-            "name": "SDR Labor (Funk)",
+            "name": "Advanced Diagnostics",
             "options": [
-                "SDR Hardware-Diagnose (Antennen-Ping)",
-                "Frequenzspektrum abhören (Live FFT Radar)",
+                "Internet Bandbreiten-Test (Speedtest)",
+                "Netzwerk-Schnittstellen (Interface Inspector)",
                 "Beenden"
             ]
         }
@@ -576,7 +535,7 @@ def interactive():
         "Der Topologie-Scan findet auch\nversteckte Geräte (z.B. Smart-Home).",
         "Der Live-Latenz Monitor hilft bei\nder Fehlersuche in Echtzeit.",
         "Dein eigener PC wird in der Topologie\nmit '(Dieses Gerät)' markiert.",
-        "Im SDR-Labor kannst du echte Funksignale\nwie z.B. Autoschlüssel scannen!"
+        "Teste unter 'Advanced Diagnostics' \ndeinen exakten Download-Speed!"
     ]
 
     def generate_main_menu(selected_idx, color_offset, current_tipp, current_tab):
@@ -710,9 +669,9 @@ def interactive():
                     sys.exit(0)
             elif current_tab == 1:
                 if selected_idx == 0:
-                    sdr_hardware_diag()
+                    speedtest_diag()
                 elif selected_idx == 1:
-                    sdr_scanner()
+                    interface_inspector()
                 elif selected_idx == 2:
                     console.print("[bold green]Auf Wiedersehen![/bold green]")
                     sys.exit(0)
