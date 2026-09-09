@@ -1,6 +1,6 @@
-typer[all]
+typer
 rich
 google-genai
 mac-vendor-lookup
 speedtest-cli
-netifaces
+psutil

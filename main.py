@@ -447,9 +447,10 @@ def interface_inspector():
     """Listet alle lokalen Netzwerk-Interfaces und Routing-Informationen auf."""
     console.print("[bold cyan]=== Netzwerk-Schnittstellen (Interface Inspector) ===[/bold cyan]")
     try:
-        import netifaces
+        import psutil
+        import socket
     except ImportError:
-        console.print("[red]Fehler: Das 'netifaces' Modul fehlt. Bitte starte start.bat neu.[/red]")
+        console.print("[red]Fehler: Das 'psutil' Modul fehlt. Bitte starte start.bat neu.[/red]")
         return
         
     table = Table(title="🔌 Lokale Netzwerk-Adapter", box=box.ROUNDED)
@@ -458,34 +459,40 @@ def interface_inspector():
     table.add_column("IPv4-Adresse", style="green")
     table.add_column("Netzmaske", style="cyan")
     
-    interfaces = netifaces.interfaces()
-    for iface in interfaces:
-        addrs = netifaces.ifaddresses(iface)
-        
-        mac = "Unbekannt"
-        if netifaces.AF_LINK in addrs:
-            mac = addrs[netifaces.AF_LINK][0].get('addr', 'Unbekannt')
-            
-        ipv4 = "-"
-        netmask = "-"
-        if netifaces.AF_INET in addrs:
-            ipv4 = addrs[netifaces.AF_INET][0].get('addr', '-')
-            netmask = addrs[netifaces.AF_INET][0].get('netmask', '-')
-            
-        # Wir blenden reine Loopback/Leere Interfaces ohne IP meistens aus, 
-        # außer sie haben eine MAC, aber für Übersichtlichkeit zeigen wir alle aktiven.
-        if ipv4 != "-" or mac != "Unbekannt":
-            table.add_row(str(iface), str(mac), str(ipv4), str(netmask))
-            
-    console.print(table)
-    
-    # Default Gateway
     try:
-        gws = netifaces.gateways()
-        default_gw = gws.get('default', {})
-        if netifaces.AF_INET in default_gw:
-            gw_ip, gw_iface = default_gw[netifaces.AF_INET]
-            console.print(f"\n[bold white]Standard-Gateway (Router):[/bold white] [bold green]{gw_ip}[/bold green] auf Interface [magenta]{gw_iface}[/magenta]")
+        interfaces = psutil.net_if_addrs()
+        for iface_name, addrs in interfaces.items():
+            mac = "Unbekannt"
+            ipv4 = "-"
+            netmask = "-"
+            
+            for addr in addrs:
+                # AF_LINK is 17 on some systems, 1 on others. psutil provides psutil.AF_LINK
+                if hasattr(psutil, "AF_LINK") and addr.family == psutil.AF_LINK:
+                    mac = addr.address
+                elif addr.family == socket.AF_INET:
+                    ipv4 = addr.address
+                    netmask = addr.netmask
+            
+            # Fallback for Windows where MAC address is often family -1
+            if mac == "Unbekannt":
+                for addr in addrs:
+                    if addr.family == -1 and "-" in addr.address:
+                        mac = addr.address
+                        
+            if ipv4 != "-" or mac != "Unbekannt":
+                table.add_row(str(iface_name), str(mac), str(ipv4), str(netmask))
+                
+        console.print(table)
+    except Exception as e:
+        console.print(f"[red]Fehler beim Auslesen der Interfaces: {e}[/red]")
+    
+    # Default Gateway (using our scanner instead of netifaces)
+    try:
+        scanner = NetworkScanner()
+        gw_ip = scanner.find_gateway()
+        if gw_ip:
+            console.print(f"\n[bold white]Standard-Gateway (Router):[/bold white] [bold green]{gw_ip}[/bold green]")
     except Exception:
         pass
         
