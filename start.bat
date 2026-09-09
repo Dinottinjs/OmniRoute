@@ -70,6 +70,9 @@ GOTO START_NOW
 call venv\Scripts\activate
 
 :START_NOW
+echo [Info] Pruefe und installiere fehlende Abhaengigkeiten...
+pip install -q -r requirements.txt
+
 echo.
 echo [Info] OmniRoute wird gestartet...
 python main.py interactive
