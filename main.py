@@ -409,6 +409,11 @@ def speedtest_diag():
         console.print("[red]Fehler: Das 'speedtest-cli' Modul fehlt. Bitte starte start.bat neu.[/red]")
         return
         
+    from rich.live import Live
+    from rich.panel import Panel
+    import threading
+    import time
+    
     with Status("[cyan]Suche besten Server und messe Ping...[/cyan]", spinner="dots"):
         try:
             st = speedtest.Speedtest()
@@ -418,19 +423,68 @@ def speedtest_diag():
             console.print(f"[bold red]Konnte keinen Speedtest-Server erreichen: {e}[/bold red]")
             return
             
-    with Status("[cyan]Messe Download-Geschwindigkeit (kann einige Sekunden dauern)...[/cyan]", spinner="dots"):
-        try:
-            download_speed = st.download() / 1_000_000  # Convert to Mbps
-        except Exception as e:
-            download_speed = 0.0
+    console.print(f"[green]Verbunden mit:[/green] {st.results.server['sponsor']} ({st.results.server['name']}) | Ping: {ping_ms:.1f} ms\n")
+    
+    download_speed = 0.0
+    upload_speed = 0.0
+    
+    # --- Download Test ---
+    t_dl = threading.Thread(target=st.download)
+    t_dl.start()
+    
+    start_time = time.time()
+    with Live(refresh_per_second=5, screen=False) as live:
+        while t_dl.is_alive():
+            elapsed = time.time() - start_time
+            if elapsed > 0:
+                # bytes_received is total bytes downloaded so far. 
+                # To get Mbps: (bytes * 8) / 1,000,000 / elapsed
+                current_speed = (st.results.bytes_received * 8 / 1_000_000) / elapsed
+            else:
+                current_speed = 0.0
+                
+            bar_len = min(50, int(current_speed / 4))  # Max visuell 200 Mbit/s
+            bar = "[green]" + "#" * bar_len + "[/green]" + "[dim]" + "-" * (50 - bar_len) + "[/dim]"
             
-    with Status("[cyan]Messe Upload-Geschwindigkeit (kann einige Sekunden dauern)...[/cyan]", spinner="dots"):
-        try:
-            upload_speed = st.upload() / 1_000_000  # Convert to Mbps
-        except Exception as e:
-            upload_speed = 0.0
+            panel = Panel(
+                f"[cyan]Download wird gemessen...[/cyan]\n\n[{bar}] [bold green]{current_speed:.2f} Mbit/s[/bold green]",
+                box=box.ROUNDED, border_style="cyan", padding=(1, 2)
+            )
+            live.update(panel)
+            time.sleep(0.2)
             
-    table = Table(title="🚀 Speedtest Ergebnisse", box=box.ROUNDED)
+    # Finalize download speed
+    download_speed = st.results.download / 1_000_000
+    console.print(f"[bold green]OK: Download-Messung abgeschlossen: {download_speed:.2f} Mbit/s[/bold green]\n")
+    
+    # --- Upload Test ---
+    t_up = threading.Thread(target=st.upload)
+    t_up.start()
+    
+    start_time = time.time()
+    with Live(refresh_per_second=5, screen=False) as live:
+        while t_up.is_alive():
+            elapsed = time.time() - start_time
+            if elapsed > 0:
+                current_speed = (st.results.bytes_sent * 8 / 1_000_000) / elapsed
+            else:
+                current_speed = 0.0
+                
+            bar_len = min(50, int(current_speed / 4))
+            bar = "[magenta]" + "#" * bar_len + "[/magenta]" + "[dim]" + "-" * (50 - bar_len) + "[/dim]"
+            
+            panel = Panel(
+                f"[cyan]Upload wird gemessen...[/cyan]\n\n[{bar}] [bold magenta]{current_speed:.2f} Mbit/s[/bold magenta]",
+                box=box.ROUNDED, border_style="magenta", padding=(1, 2)
+            )
+            live.update(panel)
+            time.sleep(0.2)
+            
+    # Finalize upload speed
+    upload_speed = st.results.upload / 1_000_000
+    console.print(f"[bold magenta]OK: Upload-Messung abgeschlossen: {upload_speed:.2f} Mbit/s[/bold magenta]\n")
+            
+    table = Table(title="Speedtest Ergebnisse", box=box.ROUNDED, title_style="bold yellow")
     table.add_column("Metrik", style="cyan")
     table.add_column("Wert", justify="right", style="green")
     
@@ -440,7 +494,7 @@ def speedtest_diag():
     table.add_row("Server", f"{st.results.server['sponsor']} ({st.results.server['name']})")
     
     console.print(table)
-    console.print("\n[bold green]Bandbreitentest abgeschlossen.[/bold green]")
+    console.print("\n[bold green]Bandbreitentest erfolgreich abgeschlossen.[/bold green]")
 
 @app.command()
 def interface_inspector():

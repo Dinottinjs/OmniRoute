@@ -48,26 +48,35 @@ def _download_assets_simulation():
     console.print("[dim]Prüfe und aktualisiere IEEE OUI Datenbank (MAC Hersteller)...[/dim]")
     
     try:
-        from mac_vendor_lookup import MacLookup
-        import asyncio
+        import requests
+        import os
+        
+        url = "https://raw.githubusercontent.com/boundary/wireshark/master/manuf"
         
         with Progress(
             SpinnerColumn(),
             TextColumn("[bold blue]{task.description}"),
             "[progress.percentage]{task.percentage:>3.1f}%",
+            "•",
+            DownloadColumn(),
         ) as progress:
-            task_id = progress.add_task("Lade IEEE OUI.txt herunter...", total=100)
             
-            # Since update_vendors() is sync but can block, we just run it and manually update the progress to 100
-            # Wait, update_vendors() has an async version `update_vendors()` if it returns a coroutine. 
-            # In mac_vendor_lookup 0.1.12, MacLookup().update_vendors() is synchronous.
-            mac = MacLookup()
-            mac.update_vendors()
+            # Start request with stream
+            response = requests.get(url, stream=True, timeout=10)
+            response.raise_for_status()
             
-            progress.update(task_id, completed=100)
+            # Die Dateigröße kann bei raw.githubusercontent.com manchmal fehlen, Fallback auf ~1.8 MB
+            total_size = int(response.headers.get('content-length', 1800000))
+            task_id = progress.add_task("Lade IEEE OUI Datenbank...", total=total_size)
             
+            with open("oui.txt", "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        progress.update(task_id, advance=len(chunk))
+                        
         console.print("[bold green]Alle internen Datenbanken sind aktuell.[/bold green]")
     except ImportError:
-        console.print("[red]Fehler: Das 'mac-vendor-lookup' Modul fehlt. Bitte installiere die requirements.txt![/red]")
+        console.print("[red]Fehler: Das 'requests' Modul fehlt. Bitte installiere die requirements.txt![/red]")
     except Exception as e:
         console.print(f"[red]Fehler beim Herunterladen der OUI-Datenbank: {e}[/red]")
