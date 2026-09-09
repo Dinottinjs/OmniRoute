@@ -1,6 +1,6 @@
 typer
 rich
 google-genai
-requests
+mac-vendor-lookup
 speedtest-cli
 psutil

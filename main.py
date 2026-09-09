@@ -433,25 +433,27 @@ def speedtest_diag():
     t_dl.start()
     
     start_time = time.time()
-    with Live(refresh_per_second=5, screen=False) as live:
+    with Live(refresh_per_second=10, screen=False) as live:
         while t_dl.is_alive():
             elapsed = time.time() - start_time
-            if elapsed > 0:
-                # bytes_received is total bytes downloaded so far. 
-                # To get Mbps: (bytes * 8) / 1,000,000 / elapsed
-                current_speed = (st.results.bytes_received * 8 / 1_000_000) / elapsed
-            else:
-                current_speed = 0.0
+            dots = "." * (int(elapsed * 2) % 4)
+            
+            # Ping-Pong Animation für die Bar
+            pos = int(elapsed * 10) % 50
+            if int(elapsed * 10) % 100 >= 50:
+                pos = 49 - pos
                 
-            bar_len = min(50, int(current_speed / 4))  # Max visuell 200 Mbit/s
-            bar = "[green]" + "#" * bar_len + "[/green]" + "[dim]" + "-" * (50 - bar_len) + "[/dim]"
+            bar_chars = ["-"] * 50
+            for i in range(max(0, pos - 4), min(50, pos + 5)):
+                bar_chars[i] = "#"
+            bar = "".join(bar_chars)
             
             panel = Panel(
-                f"[cyan]Download wird gemessen...[/cyan]\n\n[{bar}] [bold green]{current_speed:.2f} Mbit/s[/bold green]",
+                f"[cyan]Download wird gemessen{dots}[/cyan]\n\n[[green]{bar}[/green]] [bold yellow]Ermittle Bandbreite...[/bold yellow]",
                 box=box.ROUNDED, border_style="cyan", padding=(1, 2)
             )
             live.update(panel)
-            time.sleep(0.2)
+            time.sleep(0.1)
             
     # Finalize download speed
     download_speed = st.results.download / 1_000_000
@@ -462,23 +464,26 @@ def speedtest_diag():
     t_up.start()
     
     start_time = time.time()
-    with Live(refresh_per_second=5, screen=False) as live:
+    with Live(refresh_per_second=10, screen=False) as live:
         while t_up.is_alive():
             elapsed = time.time() - start_time
-            if elapsed > 0:
-                current_speed = (st.results.bytes_sent * 8 / 1_000_000) / elapsed
-            else:
-                current_speed = 0.0
+            dots = "." * (int(elapsed * 2) % 4)
+            
+            pos = int(elapsed * 10) % 50
+            if int(elapsed * 10) % 100 >= 50:
+                pos = 49 - pos
                 
-            bar_len = min(50, int(current_speed / 4))
-            bar = "[magenta]" + "#" * bar_len + "[/magenta]" + "[dim]" + "-" * (50 - bar_len) + "[/dim]"
+            bar_chars = ["-"] * 50
+            for i in range(max(0, pos - 4), min(50, pos + 5)):
+                bar_chars[i] = "#"
+            bar = "".join(bar_chars)
             
             panel = Panel(
-                f"[cyan]Upload wird gemessen...[/cyan]\n\n[{bar}] [bold magenta]{current_speed:.2f} Mbit/s[/bold magenta]",
+                f"[cyan]Upload wird gemessen{dots}[/cyan]\n\n[[magenta]{bar}[/magenta]] [bold yellow]Ermittle Bandbreite...[/bold yellow]",
                 box=box.ROUNDED, border_style="magenta", padding=(1, 2)
             )
             live.update(panel)
-            time.sleep(0.2)
+            time.sleep(0.1)
             
     # Finalize upload speed
     upload_speed = st.results.upload / 1_000_000

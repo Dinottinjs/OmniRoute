@@ -169,33 +169,16 @@ class NetworkScanner:
             unique_devices = {dev['ip']: dev['mac'] for dev in devices}
             result_devices = [{'ip': ip, 'mac': mac} for ip, mac in unique_devices.items()]
             
-            vendor_cache = {}
-            oui_file = "oui.txt"
-            
-            import os
             try:
-                import requests
-                if not os.path.exists(oui_file):
-                    r = requests.get("https://raw.githubusercontent.com/boundary/wireshark/master/manuf", timeout=5)
-                    if r.status_code == 200:
-                        with open(oui_file, "w", encoding="utf-8") as f:
-                            f.write(r.text)
-            except Exception:
-                pass
-            
-            if os.path.exists(oui_file):
+                from mac_vendor_lookup import MacLookup
+                mac_lookup = MacLookup()
                 try:
-                    with open(oui_file, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if line.startswith("#") or not line.strip():
-                                continue
-                            parts = line.split('\t')
-                            if len(parts) >= 3:
-                                vendor_cache[parts[0].strip().upper()] = parts[2].strip()
-                            elif len(parts) >= 2:
-                                vendor_cache[parts[0].strip().upper()] = parts[1].strip()
+                    mac_lookup.load_vendors()
                 except Exception:
-                    pass
+                    mac_lookup.update_vendors()
+                    mac_lookup.load_vendors()
+            except Exception:
+                mac_lookup = None
             
             # Hostnames auflösen (Multithreaded für maximale Geschwindigkeit)
             import socket
@@ -207,9 +190,14 @@ class NetworkScanner:
                 except Exception:
                     device['hostname'] = "Unbekannt"
                     
-                mac_str = str(device['mac']).replace("-", ":").upper()
-                oui = mac_str[:8]
-                device['vendor'] = vendor_cache.get(oui, "Unbekannt")
+                mac_str = str(device['mac']).replace("-", ":")
+                if mac_lookup:
+                    try:
+                        device['vendor'] = mac_lookup.lookup(mac_str)
+                    except Exception:
+                        device['vendor'] = "Unbekannt"
+                else:
+                    device['vendor'] = "Unbekannt"
                     
             with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
                 executor.map(resolve_hostname, result_devices)
